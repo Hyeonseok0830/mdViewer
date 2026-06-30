@@ -51,6 +51,7 @@
     "@types/ws": "^8.18.1",
     "electron": "^41.7.1",
     "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.1",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",
     "vitest": "^4.1.9"
