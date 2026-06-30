@@ -47,6 +47,7 @@
     "unist-util-visit": "^5.1.0"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^20.14.0",
     "@types/ws": "^8.18.1",
     "electron": "^41.7.1",
