@@ -5,10 +5,6 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-    inputs:
-      version:
-        description: '릴리즈 버전 (예: 0.1.0)'
-        required: false
 
 jobs:
   build-windows:
@@ -28,27 +24,22 @@ jobs:
       - name: TypeScript 컴파일
         run: npm run build
 
-      - name: 아이콘 확인
-        run: |
-          if (!(Test-Path "assets/icon.ico")) {
-            Write-Warning "assets/icon.ico 없음 — 기본 Electron 아이콘 사용"
-          }
-        shell: pwsh
-
       - name: NSIS 인스톨러 빌드
-        run: npx electron-builder --win --target=nsis
+        run: npx electron-builder --win nsis
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: APPX 빌드 (Microsoft Store)
-        run: npx electron-builder --win --target=appx
+        run: npx electron-builder --win appx
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true   # publisher 정보 미설정 시 실패 가능
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+        continue-on-error: true
 
       - name: 빌드 결과 목록
-        run: Get-ChildItem release/ -Recurse -Include *.exe,*.appx | Format-Table Name,Length
         shell: pwsh
+        run: Get-ChildItem release/ -Recurse -Include *.exe,*.appx,*.msix | Format-Table Name,Length
 
       - name: 아티팩트 업로드
         uses: actions/upload-artifact@v4
@@ -57,37 +48,17 @@ jobs:
           path: |
             release/*.exe
             release/*.appx
+            release/*.msix
           retention-days: 30
 
-      - name: GitHub 릴리즈 생성
+      - name: NSIS 인스톨러 Release에 업로드
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: mdViewer ${{ github.ref_name }}
-          body: |
-            ## mdViewer ${{ github.ref_name }}
-
-            ### 설치 방법
-
-            #### 일반 설치 (권장)
-            `mdViewer-Setup-*.exe` 다운로드 후 실행
-
-            #### 포터블 실행
-            `mdViewer-*-portable.exe` 다운로드 후 바로 실행
-
-            #### Microsoft Store (APPX)
-            `mdViewer-*.appx` 다운로드 후 더블클릭 설치
-            > ⚠ Store 인증서가 없는 경우 개발자 모드에서만 설치 가능합니다.
-
-            ### 변경 사항
-            <!-- 릴리즈 노트를 여기에 작성하세요 -->
-
-            ---
-            `.md` 파일 우클릭 → **mdViewer로 열기** 또는 폴더를 드래그하여 실행
+          tag_name: ${{ github.ref_name }}
           files: |
             release/*.exe
             release/*.appx
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}
+            release/*.msix
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
