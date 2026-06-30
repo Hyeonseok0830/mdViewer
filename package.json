@@ -127,7 +127,8 @@
       "identityName": "dev.wombat.MdPad",
       "publisher": "CN=A45D67D6-702F-427F-A0BF-48E664792AFA",
       "publisherDisplayName": "dev.wombat",
-      "backgroundColor": "#0d1117",
+      "backgroundColor": "#1e1b4b",
+      "minVersion": "10.0.18362.0",
       "languages": [
         "ko-KR",
         "en-US"
