@@ -37,6 +37,15 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
         continue-on-error: true
 
+      - name: APPX → MSIX 복사 (스토어 제출용)
+        shell: pwsh
+        run: |
+          Get-ChildItem release/*.appx | ForEach-Object {
+            $msix = $_.FullName -replace '\.appx$', '.msix'
+            Copy-Item $_.FullName $msix
+            Write-Host "생성: $msix"
+          }
+
       - name: 빌드 결과 목록
         shell: pwsh
         run: Get-ChildItem release/ -Recurse -Include *.exe,*.appx,*.msix | Format-Table Name,Length
