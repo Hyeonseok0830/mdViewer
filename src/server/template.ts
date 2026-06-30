@@ -22,7 +22,7 @@ export function buildHtml(
   config?: HtmlConfig,
 ): string {
   const filename = filePath ? basename(filePath) : '';
-  const title = (frontmatter?.title as string | undefined) ?? (filename.replace(/\.md$/i, '') || 'mdViewer');
+  const title = (frontmatter?.title as string | undefined) ?? (filename.replace(/\.md$/i, '') || 'MdPad');
   const configJson = JSON.stringify(config ?? { isDir: false, files: [], currentPath: filePath, tree: null });
   const fmJson = JSON.stringify(frontmatter ?? {});
 
@@ -31,7 +31,7 @@ export function buildHtml(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${esc(title)} — mdViewer</title>
+  <title>${esc(title)} — MdPad</title>
   <link rel="stylesheet" href="/katex/katex.min.css" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -193,7 +193,7 @@ export function buildHtml(
   </script>
 
   <div id="header">
-    <span class="logo">mdViewer</span>
+    <span class="logo">MdPad</span>
     <span id="header-sep" style="opacity:.3${filename ? '' : ';display:none'}"> / </span>
     <span id="filepath" style="${filename ? '' : 'display:none'}"><span id="filepath-name">${esc(filename)}</span><span id="modified-dot">●</span></span>
     <div id="mode-btns">
@@ -461,7 +461,7 @@ export function buildHtml(
         setActiveFile(abs);
         currentRel=rel;
         var name=d.name||rel.split('/').pop();
-        document.title=name.replace(/\\.md$/i,'')+'  — mdViewer';
+        document.title=name.replace(/\\.md$/i,'')+'  — MdPad';
         if (filepathName) filepathName.textContent=name;
         if (filepath)  filepath.style.display='';
         if (headerSep) headerSep.style.display='';

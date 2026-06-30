@@ -1,7 +1,7 @@
 {
-  "name": "mdviewer",
+  "name": "mdpad",
   "version": "0.1.0",
-  "description": "로컬 마크다운 파일 브라우저 실시간 뷰어",
+  "description": "로컬 마크다운 파일 실시간 뷰어/편집기",
   "author": {
     "name": "Hyeonseok",
     "email": "96hyeonseok@gmail.com",
@@ -58,8 +58,8 @@
     "vitest": "^4.1.9"
   },
   "build": {
-    "appId": "com.mdviewer.app",
-    "productName": "mdViewer",
+    "appId": "com.mdpad.app",
+    "productName": "MdPad",
     "copyright": "Copyright © 2026",
     "directories": {
       "output": "release",
@@ -119,14 +119,14 @@
       "installerHeaderIcon": "assets/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "mdViewer"
+      "shortcutName": "MdPad"
     },
     "appx": {
-      "applicationId": "mdViewer",
-      "displayName": "mdViewer",
-      "identityName": "YourPublisherAlias.mdViewer",
-      "publisher": "CN=YourName, O=YourOrg, C=KR",
-      "publisherDisplayName": "YourName",
+      "applicationId": "MdPad",
+      "displayName": "MdPad",
+      "identityName": "dev.wombat.MdPad",
+      "publisher": "CN=A45D67D6-702F-427F-A0BF-48E664792AFA",
+      "publisherDisplayName": "dev.wombat",
       "backgroundColor": "#0d1117",
       "languages": [
         "ko-KR",

@@ -1,8 +1,8 @@
-# mdViewer
+# MdPad
 
 로컬 마크다운 파일을 실시간으로 렌더링하는 뷰어/편집기 데스크탑 앱입니다.
 
-![mdViewer](assets/icon.svg)
+![MdPad](assets/icon.svg)
 
 ## 기능
 

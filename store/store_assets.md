@@ -24,8 +24,8 @@
 
 | 항목 | 값 |
 |------|---|
-| 앱 이름 | mdViewer |
-| 앱 ID (영문) | mdViewer |
+| 앱 이름 | MdPad |
+| 앱 ID (영문) | MdPad |
 | 카테고리 | 생산성 > 개발자 도구 |
 | 서브 카테고리 | 유틸리티 |
 | 연령 등급 | 전체 이용가 |
@@ -48,7 +48,7 @@
 ### 개인정보 처리방침 URL
 
 GitHub Pages 또는 별도 URL에 호스팅 필요:
-- `https://hyeonseok0830.github.io/mdViewer/privacy` (예시)
+- `https://hyeonseok0830.github.io/MdPad/privacy` (예시)
 - 또는 `store/privacy_policy_en.md` 내용을 웹페이지로 게시
 
 ## MSIX 패키지 정보 (package.json build.appx)
@@ -57,9 +57,9 @@ GitHub Pages 또는 별도 URL에 호스팅 필요:
 
 ```json
 "appx": {
-  "applicationId": "mdViewer",
-  "displayName": "mdViewer",
-  "identityName": "YOUR_PUBLISHER_ALIAS.mdViewer",
+  "applicationId": "MdPad",
+  "displayName": "MdPad",
+  "identityName": "YOUR_PUBLISHER_ALIAS.MdPad",
   "publisher": "CN=YOUR_DISPLAY_NAME, O=YOUR_ORG, C=KR",
   "publisherDisplayName": "YOUR_DISPLAY_NAME",
   "backgroundColor": "#0d1117",

@@ -1,19 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
-  <!-- 배경 -->
-  <rect width="256" height="256" rx="48" ry="48" fill="#1a1f2e"/>
+  <!-- 앱 아이콘 배경 (딥 인디고) -->
+  <rect width="256" height="256" rx="52" fill="#1e1b4b"/>
 
-  <!-- M 자: 5개 사각형 조합 -->
-  <!-- 왼쪽 세로 기둥 -->
-  <rect x="36" y="44" width="40" height="164" rx="4" fill="#58a6ff"/>
-  <!-- 오른쪽 세로 기둥 -->
-  <rect x="180" y="44" width="40" height="164" rx="4" fill="#58a6ff"/>
-  <!-- 왼쪽 대각선 (왼 상단 → 중앙 하단) -->
-  <polygon points="76,44 114,44 128,122 90,148" fill="#58a6ff"/>
-  <!-- 오른쪽 대각선 (오른 상단 → 중앙 하단) -->
-  <polygon points="180,44 142,44 128,122 166,148" fill="#58a6ff"/>
-  <!-- 중앙 연결 꼭짓점 (삼각형 보정) -->
-  <polygon points="90,148 128,122 166,148 128,164" fill="#58a6ff"/>
+  <!-- 노트패드 종이 -->
+  <rect x="36" y="38" width="184" height="180" rx="18" fill="#f8fafc"/>
 
-  <!-- 하단 강조선 -->
-  <rect x="44" y="218" width="168" height="8" rx="4" fill="#3d88f5" opacity="0.7"/>
+  <!-- 왼쪽 바인딩 스트립 -->
+  <rect x="36" y="38" width="44" height="180" rx="18" fill="#4f46e5"/>
+  <rect x="60" y="38" width="20" height="180" fill="#4f46e5"/>
+
+  <!-- 바인딩 링 구멍 3개 -->
+  <circle cx="58" cy="88"  r="10" fill="#1e1b4b"/>
+  <circle cx="58" cy="128" r="10" fill="#1e1b4b"/>
+  <circle cx="58" cy="168" r="10" fill="#1e1b4b"/>
+
+  <!-- 콘텐츠 라인들 (마크다운 문서 표현) -->
+  <!-- H1 제목 라인 (굵음) -->
+  <rect x="98" y="68"  width="116" height="14" rx="7"   fill="#1e1b4b"/>
+  <!-- 본문 라인 -->
+  <rect x="98" y="96"  width="92"  height="9"  rx="4.5" fill="#94a3b8"/>
+  <rect x="98" y="113" width="108" height="9"  rx="4.5" fill="#94a3b8"/>
+  <!-- 코드 블록 -->
+  <rect x="98" y="134" width="116" height="36" rx="10"  fill="#e0e7ff"/>
+  <rect x="110" y="146" width="64" height="7"  rx="3.5" fill="#6366f1"/>
+  <rect x="110" y="157" width="48" height="7"  rx="3.5" fill="#818cf8"/>
+  <!-- 본문 라인 -->
+  <rect x="98" y="184" width="76"  height="9"  rx="4.5" fill="#94a3b8"/>
+  <rect x="98" y="200" width="96"  height="9"  rx="4.5" fill="#c7d2fe"/>
 </svg>

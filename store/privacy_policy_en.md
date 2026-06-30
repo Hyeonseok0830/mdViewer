@@ -1,14 +1,14 @@
-# mdViewer Privacy Policy
+# MdPad Privacy Policy
 
 Last updated: June 30, 2026
 
 ## 1. Overview
 
-mdViewer ("the App") respects your privacy. This policy explains what information the App collects and how it is used.
+MdPad ("the App") respects your privacy. This policy explains what information the App collects and how it is used.
 
 ## 2. Information We Collect
 
-**mdViewer does not collect any personal information.**
+**MdPad does not collect any personal information.**
 
 The App works as follows:
 
@@ -48,5 +48,5 @@ If this Privacy Policy changes, we will notify you through an app update.
 
 For questions about this Privacy Policy, please contact us:
 
-- GitHub Issues: https://github.com/Hyeonseok0830/mdViewer/issues
+- GitHub Issues: https://github.com/Hyeonseok0830/MdPad/issues
 - Email: 96hyeonseok@gmail.com

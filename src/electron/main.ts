@@ -38,7 +38,7 @@ function createWindow(): BrowserWindow {
     height: 900,
     minWidth: 700,
     minHeight: 500,
-    title: 'mdViewer',
+    title: 'MdPad',
     icon: getIconPath(),
     show: false,
     backgroundColor: '#0d1117',
@@ -83,7 +83,7 @@ function buildMenu(): void {
 
   const template: Electron.MenuItemConstructorOptions[] = [
     {
-      label: 'mdViewer',
+      label: 'MdPad',
       submenu: [
         { label: '파일 열기...', accelerator: 'CmdOrCtrl+O', click: () => openFileDialog() },
         { label: '폴더 열기...', accelerator: 'CmdOrCtrl+Shift+O', click: () => openFolderDialog() },
@@ -106,7 +106,7 @@ function buildMenu(): void {
       label: '도움말',
       submenu: [
         {
-          label: 'mdViewer 정보',
+          label: 'MdPad 정보',
           click: () => showAboutDialog(version),
         },
         { type: 'separator' },
@@ -133,9 +133,9 @@ function showAboutDialog(version: string): void {
   const { versions } = process;
   dialog.showMessageBox(mainWindow!, {
     type: 'info',
-    title: 'mdViewer 정보',
+    title: 'MdPad 정보',
     icon: undefined,
-    message: 'mdViewer',
+    message: 'MdPad',
     detail: [
       `버전: ${version}`,
       '',
@@ -193,7 +193,7 @@ async function startServer(inputPath: string): Promise<void> {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.loadURL(url);
       const label = isDir ? inputPath.split(/[/\\]/).pop() : inputPath.split(/[/\\]/).pop();
-      mainWindow.setTitle(`mdViewer — ${label}`);
+      mainWindow.setTitle(`MdPad — ${label}`);
     }
   });
 

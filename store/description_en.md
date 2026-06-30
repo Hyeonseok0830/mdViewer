@@ -1,4 +1,4 @@
-# mdViewer — Markdown Viewer & Editor
+# MdPad — Markdown Viewer & Editor
 
 ## Short Description (max 200 chars)
 
@@ -8,7 +8,7 @@ A real-time Markdown viewer and editor with syntax highlighting, math (KaTeX), a
 
 ## Full Description (max 10,000 chars)
 
-**mdViewer** is a local Markdown viewer and editor built for developers and writers.
+**MdPad** is a local Markdown viewer and editor built for developers and writers.
 The preview updates the instant you save, so you can write Markdown comfortably without opening a separate browser.
 
 ### Key Features
