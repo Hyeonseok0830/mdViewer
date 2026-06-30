@@ -25,15 +25,18 @@ jobs:
         run: npm run build
 
       - name: NSIS 인스톨러 빌드
-        run: npx electron-builder --win nsis
+        run: npx electron-builder --win nsis -p never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Portable 빌드 (설치 불필요)
+        run: npx electron-builder --win portable -p never
+        env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: APPX 빌드 (Microsoft Store)
-        run: npx electron-builder --win appx
+        run: npx electron-builder --win appx -p never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
         continue-on-error: true
 
