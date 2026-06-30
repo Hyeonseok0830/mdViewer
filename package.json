@@ -80,7 +80,8 @@
     ],
     "asarUnpack": [
       "**/node_modules/katex/dist/**",
-      "**/node_modules/shiki/**"
+      "**/node_modules/shiki/**",
+      "assets/icon.ico"
     ],
     "win": {
       "target": [

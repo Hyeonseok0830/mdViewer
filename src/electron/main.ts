@@ -27,6 +27,11 @@ function getKatexPath(): string {
 }
 
 // ── 창 생성 ─────────────────────────────────────────────────
+function getIconPath(): string {
+  if (app.isPackaged) return join(process.resourcesPath, 'app.asar.unpacked', 'assets', 'icon.ico');
+  return join(__dirname, '../../../assets/icon.ico');
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1400,
@@ -34,6 +39,7 @@ function createWindow(): BrowserWindow {
     minWidth: 700,
     minHeight: 500,
     title: 'mdViewer',
+    icon: getIconPath(),
     show: false,
     backgroundColor: '#0d1117',
     webPreferences: {
