@@ -111,6 +111,44 @@
         }
       ]
     },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "fileAssociations": [
+        {
+          "ext": ["md", "markdown"],
+          "name": "Markdown File",
+          "description": "Markdown 문서",
+          "role": "Editor"
+        }
+      ]
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Utility",
+      "fileAssociations": [
+        {
+          "ext": ["md", "markdown"],
+          "name": "Markdown File",
+          "description": "Markdown 문서",
+          "role": "Editor"
+        }
+      ]
+    },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,

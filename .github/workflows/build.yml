@@ -63,7 +63,7 @@ jobs:
             release/*.msix
           retention-days: 30
 
-      - name: NSIS 인스톨러 Release에 업로드
+      - name: Release에 업로드
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
@@ -72,5 +72,96 @@ jobs:
             release/*.exe
             release/*.appx
             release/*.msix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: TypeScript 컴파일
+        run: npm run build
+
+      - name: DMG 빌드
+        run: npx electron-builder --mac dmg -p never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: 빌드 결과 목록
+        run: ls -lh release/
+
+      - name: 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdViewer-macos-${{ github.ref_name || 'dev' }}
+          path: release/*.dmg
+          retention-days: 30
+
+      - name: Release에 업로드
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: release/*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: TypeScript 컴파일
+        run: npm run build
+
+      - name: AppImage 빌드
+        run: npx electron-builder --linux AppImage -p never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: deb 패키지 빌드
+        run: npx electron-builder --linux deb -p never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: 빌드 결과 목록
+        run: ls -lh release/
+
+      - name: 아티팩트 업로드
+        uses: actions/upload-artifact@v4
+        with:
+          name: mdViewer-linux-${{ github.ref_name || 'dev' }}
+          path: |
+            release/*.AppImage
+            release/*.deb
+          retention-days: 30
+
+      - name: Release에 업로드
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            release/*.AppImage
+            release/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
