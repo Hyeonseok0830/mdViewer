@@ -33,13 +33,17 @@ export class ServerAgent {
   private renders = new Map<string, RenderCache>();
   private fileList: { name: string; relativePath: string; absolutePath: string }[] = [];
   private renderAgent: RenderAgent | null = null;
+  private fileListReady: Promise<void>;
+  private resolveFileList!: () => void;
 
   constructor(
     private port: number = 3000,
     private rootDir: string = '',
     private isDir: boolean = false,
     private katexPath: string = DEFAULT_KATEX_DIST,
-  ) {}
+  ) {
+    this.fileListReady = new Promise((resolve) => { this.resolveFileList = resolve; });
+  }
 
   setRenderAgent(ra: RenderAgent): void {
     this.renderAgent = ra;
@@ -55,6 +59,7 @@ export class ServerAgent {
 
     // ── 초기 뷰어 페이지 ──────────────────────────────
     this.app.get('/', async (req, reply) => {
+      await this.fileListReady;
       const queryFile = (req.query as Record<string, string>).file;
       // 디렉토리 모드에서 특정 파일 지정이 없으면 빈 상태로 시작
       const displayPath = this.isDir && !queryFile ? '' : this.resolveDisplayPath(queryFile);
@@ -174,6 +179,9 @@ export class ServerAgent {
         relativePath: this.rootDir ? relative(this.rootDir, f.path) : basename(f.path),
         absolutePath: f.path,
       }));
+      this.resolveFileList();
+      // 이미 연결된 클라이언트에게 트리 업데이트 전송
+      this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
     });
 
     bus.typedOn('render:done', ({ html, path, toc, frontmatter }) => {

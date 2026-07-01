@@ -546,7 +546,21 @@ export function buildHtml(
       ws.onopen=function(){retries=0;dot.className='dot';statusText.textContent='연결됨';};
       ws.onmessage=function(e) {
         var msg=JSON.parse(e.data);
-        if (msg.type==='update') {
+        if (msg.type==='tree:update') {
+          cfg.tree=msg.tree;
+          cfg.files=msg.files;
+          if (msg.tree&&msg.tree.children&&msg.tree.children.length) {
+            treeSection.style.display='block';
+            treeRoot.innerHTML=renderTreeChildren(msg.tree.children,'');
+            treeRoot.querySelectorAll('.tree-file a').forEach(function(a) {
+              a.addEventListener('click', function(e) { e.preventDefault(); loadFile(this.dataset.rel,this.dataset.abs); });
+            });
+            treeRoot.querySelectorAll('.tree-dir-label').forEach(function(el) {
+              el.addEventListener('click', function() { toggleDir(this); });
+            });
+            expandToActive();
+          }
+        } else if (msg.type==='update') {
           if (msg.path&&currentPath&&msg.path!==currentPath) return;
           // 편집 중이면 미리보기만 업데이트 (에디터 내용은 유지)
           if (currentMode!=='view'&&Date.now()-lastEditTime<2000) return;
