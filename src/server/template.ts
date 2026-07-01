@@ -394,21 +394,23 @@ export function buildHtml(
       expandToActive();
     }
 
-    function renderTreeChildren(nodes, prefix) {
+    function renderTreeChildren(nodes, prefix, depth) {
+      var d = depth || 0;
+      var pl = (10 + d * 14) + 'px';
       var html='';
       for (var i=0;i<nodes.length;i++) {
         var n=nodes[i];
         if (n.type==='dir') {
           var id='dir-'+esc(prefix+n.name).replace(/[^a-zA-Z0-9]/g,'-');
-          html+='<li class="tree-dir"><div class="tree-dir-label" data-id="'+id+'">'
+          html+='<li class="tree-dir"><div class="tree-dir-label" data-id="'+id+'" style="padding-left:'+pl+'">'
             +'<span class="tree-arrow" id="arr-'+id+'">▶</span>'
             +'<span>📁 '+esc(n.name)+'</span></div>'
             +'<ul class="tree-children tree-list" id="'+id+'">'
-            +(n.children?renderTreeChildren(n.children,prefix+n.name+'/'):'')
+            +(n.children?renderTreeChildren(n.children,prefix+n.name+'/',d+1):'')
             +'</ul></li>';
         } else {
           var isActive=(n.absPath===currentPath);
-          html+='<li class="tree-file"><a href="#" data-rel="'+esc(n.path)+'" data-abs="'+esc(n.absPath)+'" class="'+(isActive?'active':'')+'">'
+          html+='<li class="tree-file"><a href="#" data-rel="'+esc(n.path)+'" data-abs="'+esc(n.absPath)+'" class="'+(isActive?'active':'')+'" style="padding-left:'+pl+'">'
             +'📄 '+esc(n.name.replace(/\\.md$/i,''))+'</a></li>';
         }
       }
