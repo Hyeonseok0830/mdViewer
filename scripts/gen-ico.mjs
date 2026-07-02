@@ -50,3 +50,8 @@ const pngs = sizes.map(renderPng);
 const ico = buildIco(pngs);
 writeFileSync(join(root, 'assets', 'icon.ico'), ico);
 console.log('assets/icon.ico 생성 완료 (' + sizes.join(', ') + 'px)');
+
+// APPX/Microsoft Store 타일용 고해상도 PNG (1024x1024)
+const png1024 = renderPng(1024);
+writeFileSync(join(root, 'assets', 'icon.png'), png1024);
+console.log('assets/icon.png 생성 완료 (1024x1024)');
