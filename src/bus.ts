@@ -23,6 +23,9 @@ export interface RenderDonePayload {
   html: string;
   toc: TocItem[];
   frontmatter: Record<string, unknown>;
+  tags: string[];
+  wordCount: number;
+  wikiLinks: string[];
 }
 
 export interface RenderErrorPayload {
@@ -38,6 +41,7 @@ export interface ServerReadyPayload {
 interface BusEventMap {
   'file:ready': FileReadyPayload[];
   'file:changed': FileChangedPayload;
+  'file:added': { path: string };
   'render:done': RenderDonePayload;
   'render:error': RenderErrorPayload;
   'server:ready': ServerReadyPayload;

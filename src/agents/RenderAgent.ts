@@ -7,6 +7,28 @@ import { bus, type TocItem } from '../bus.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyProcessor = { process(input: string): Promise<{ toString(): string; data: unknown }> };
 
+function extractTags(content: string): string[] {
+  const noFrontmatter = content.replace(/^---[\s\S]*?---\n?/, '');
+  const noCode = noFrontmatter.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '');
+  const pattern = /#([a-zA-Z가-힣][a-zA-Z0-9가-힣_-]*)/g;
+  const tags = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(noCode)) !== null) tags.add(m[1]);
+  return [...tags];
+}
+
+function countWords(content: string): number {
+  const noCode = content.replace(/```[\s\S]*?```/g, ' ').replace(/`[^`]+`/g, ' ');
+  const clean = noCode
+    .replace(/!\[.*?\]\(.*?\)/g, ' ')
+    .replace(/\[.*?\]\(.*?\)/g, ' ')
+    .replace(/#+\s/g, ' ')
+    .replace(/[*_~>`#]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return clean ? clean.split(/\s+/).length : 0;
+}
+
 export class RenderAgent {
   readonly name = 'RenderAgent';
   private processor: AnyProcessor | null = null;
@@ -32,29 +54,36 @@ export class RenderAgent {
     if (!this.processor) return;
 
     try {
-      // frontmatter 분리
       const { data: frontmatter, content } = matter(raw);
 
-      // unified 파이프라인 실행
       const vfile = await this.processor.process(content);
       const html = String(vfile);
       const toc = ((vfile.data as Record<string, unknown>).toc as TocItem[]) ?? [];
+      const wikiLinks = ((vfile.data as Record<string, unknown>).wikiLinks as string[]) ?? [];
+      const tags = extractTags(raw);
+      const wordCount = countWords(content);
 
-      bus.typedEmit('render:done', { path: filePath, html, toc, frontmatter });
+      bus.typedEmit('render:done', { path: filePath, html, toc, frontmatter, tags, wordCount, wikiLinks });
     } catch (err) {
       bus.typedEmit('render:error', { path: filePath, error: err as Error });
     }
   }
 
   /** 이벤트 발행 없이 즉시 렌더링 결과를 반환 (on-demand / 에디터 미리보기용) */
-  async renderRaw(raw: string): Promise<{ html: string; toc: TocItem[]; frontmatter: Record<string, unknown> }> {
+  async renderRaw(raw: string): Promise<{ html: string; toc: TocItem[]; frontmatter: Record<string, unknown>; tags: string[]; wordCount: number; wikiLinks: string[] }> {
     if (!this.processor) throw new Error('RenderAgent 초기화 전입니다');
     const { data: frontmatter, content } = matter(raw);
     const vfile = await this.processor.process(content);
+    const wikiLinks = ((vfile.data as Record<string, unknown>).wikiLinks as string[]) ?? [];
+    const tags = extractTags(raw);
+    const wordCount = countWords(content);
     return {
       html: String(vfile),
       toc: ((vfile.data as Record<string, unknown>).toc as TocItem[]) ?? [],
       frontmatter: frontmatter as Record<string, unknown>,
+      tags,
+      wordCount,
+      wikiLinks,
     };
   }
 

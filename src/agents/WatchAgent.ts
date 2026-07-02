@@ -25,6 +25,10 @@ export class WatchAgent {
         awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
       });
       this.watcher.on('change', (rel) => this.handleChange(join(this.resolved, rel)));
+      this.watcher.on('add', (rel) => {
+        const abs = join(this.resolved, rel);
+        bus.typedEmit('file:added', { path: abs });
+      });
     } else {
       this.watcher = chokidar.watch(this.resolved, {
         persistent: true,

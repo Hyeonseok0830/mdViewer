@@ -35,6 +35,10 @@ export class ServerAgent {
   private renderAgent: RenderAgent | null = null;
   private fileListReady: Promise<void>;
   private resolveFileList!: () => void;
+  private backlinksIndex = new Map<string, Set<string>>();
+  private tagsIndex = new Map<string, Set<string>>();
+  private wordCounts = new Map<string, number>();
+  private contentIndex = new Map<string, string>();
 
   constructor(
     private port: number = 3000,
@@ -61,7 +65,6 @@ export class ServerAgent {
     this.app.get('/', async (req, reply) => {
       await this.fileListReady;
       const queryFile = (req.query as Record<string, string>).file;
-      // 디렉토리 모드에서 특정 파일 지정이 없으면 빈 상태로 시작
       const displayPath = this.isDir && !queryFile ? '' : this.resolveDisplayPath(queryFile);
       const render = displayPath ? this.renders.get(displayPath) : undefined;
 
@@ -102,6 +105,7 @@ export class ServerAgent {
           const result = await this.renderAgent.renderRaw(raw);
           cached = result;
           this.renders.set(abs, cached);
+          this.wordCounts.set(abs, result.wordCount);
         } catch {
           return reply.code(404).send({ error: '파일을 찾을 수 없거나 렌더링 실패' });
         }
@@ -112,6 +116,7 @@ export class ServerAgent {
         relativePath: relative(this.rootDir, abs),
         absolutePath: abs,
         name: basename(abs),
+        wordCount: this.wordCounts.get(abs) ?? 0,
       };
     });
 
@@ -159,6 +164,101 @@ export class ServerAgent {
       }
     });
 
+    // ── 백링크 API ────────────────────────────────────
+    this.app.get('/api/backlinks', async (req, reply) => {
+      const rel = (req.query as Record<string, string>).file;
+      if (!rel) return reply.code(400).send({ error: 'file 파라미터가 필요합니다' });
+      const abs = resolve(this.rootDir, rel);
+      const sources = this.backlinksIndex.get(abs) ?? new Set();
+      const backlinks = [...sources]
+        .map(s => this.fileList.find(f => f.absolutePath === s))
+        .filter(Boolean);
+      return { backlinks };
+    });
+
+    // ── 태그 API ──────────────────────────────────────
+    this.app.get('/api/tags', async () => {
+      const tags = [...this.tagsIndex.entries()]
+        .map(([name, files]) => ({
+          name,
+          count: files.size,
+          files: [...files].map(abs => this.fileList.find(f => f.absolutePath === abs)).filter(Boolean),
+        }))
+        .sort((a, b) => b.count - a.count);
+      return { tags };
+    });
+
+    // ── 전문 검색 API ─────────────────────────────────
+    this.app.get('/api/search', async (req) => {
+      const q = ((req.query as Record<string, string>).q ?? '').toLowerCase().trim();
+      if (!q || q.length < 2) return { results: [] };
+      const results = [];
+      for (const f of this.fileList) {
+        const content = this.contentIndex.get(f.absolutePath) ?? '';
+        const lc = content.toLowerCase();
+        if (!lc.includes(q)) continue;
+        const idx = lc.indexOf(q);
+        const start = Math.max(0, idx - 60);
+        const end = Math.min(content.length, idx + q.length + 60);
+        const snippet = (start > 0 ? '...' : '') + content.slice(start, end).replace(/\n/g, ' ') + (end < content.length ? '...' : '');
+        results.push({ name: f.name, relativePath: f.relativePath, absolutePath: f.absolutePath, snippet });
+      }
+      return { results: results.slice(0, 50) };
+    });
+
+    // ── 그래프 API ────────────────────────────────────
+    this.app.get('/api/graph', async () => {
+      const nodes = this.fileList.map(f => ({
+        id: f.absolutePath,
+        label: f.name.replace(/\.md$/i, ''),
+        relativePath: f.relativePath,
+        absolutePath: f.absolutePath,
+      }));
+      const edges: { source: string; target: string }[] = [];
+      for (const [target, sources] of this.backlinksIndex) {
+        for (const source of sources) {
+          if (this.fileList.find(f => f.absolutePath === source) && this.fileList.find(f => f.absolutePath === target)) {
+            edges.push({ source, target });
+          }
+        }
+      }
+      return { nodes, edges };
+    });
+
+    // ── 단어 수 API ───────────────────────────────────
+    this.app.get('/api/wordcount', async (req, reply) => {
+      const rel = (req.query as Record<string, string>).file;
+      if (!rel) return reply.code(400).send({ error: 'file 파라미터가 필요합니다' });
+      const abs = resolve(this.rootDir, rel);
+      return { wordCount: this.wordCounts.get(abs) ?? 0 };
+    });
+
+    // ── 파일 생성 API ─────────────────────────────────
+    this.app.post('/api/files/new', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const { dir = '', name } = req.body as { dir?: string; name: string };
+      if (!name) return reply.code(400).send({ error: '파일명이 필요합니다' });
+      const safeName = name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
+      if (!safeName) return reply.code(400).send({ error: '유효하지 않은 파일명' });
+      const filename = safeName.endsWith('.md') ? safeName : safeName + '.md';
+      const absDir = dir ? resolve(this.rootDir, dir) : this.rootDir;
+      const abs = join(absDir, filename);
+      if (!this.isSafePath(abs)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      const rel = relative(this.rootDir, abs).replace(/\\/g, '/');
+      try {
+        await writeFile(abs, `# ${safeName.replace(/\.md$/i, '')}\n\n`, { flag: 'wx' });
+        const newEntry = { name: filename, relativePath: rel, absolutePath: abs };
+        this.fileList.push(newEntry);
+        this.contentIndex.set(abs, `# ${safeName.replace(/\.md$/i, '')}\n\n`);
+        this.fileList.sort((a, b) => a.name.localeCompare(b.name));
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+        return { relativePath: rel, absolutePath: abs };
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'EEXIST') return reply.code(409).send({ error: '파일이 이미 존재합니다' });
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
     // ── WebSocket ──────────────────────────────────
     await this.app.register(async (fastify) => {
       fastify.get('/ws', { websocket: true }, (socket: WebSocket) => {
@@ -179,13 +279,41 @@ export class ServerAgent {
         relativePath: this.rootDir ? relative(this.rootDir, f.path) : basename(f.path),
         absolutePath: f.path,
       }));
+      for (const f of files) {
+        this.contentIndex.set(f.path, f.content);
+      }
       this.resolveFileList();
-      // 이미 연결된 클라이언트에게 트리 업데이트 전송
       this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
     });
 
-    bus.typedOn('render:done', ({ html, path, toc, frontmatter }) => {
+    bus.typedOn('file:changed', ({ path, content }) => {
+      this.contentIndex.set(path, content);
+    });
+
+    bus.typedOn('render:done', ({ html, path, toc, frontmatter, tags, wordCount, wikiLinks }) => {
       this.renders.set(path, { html, toc, frontmatter: frontmatter as Record<string, unknown> });
+      this.wordCounts.set(path, wordCount);
+
+      for (const [tag, files] of this.tagsIndex) {
+        files.delete(path);
+        if (files.size === 0) this.tagsIndex.delete(tag);
+      }
+      for (const tag of tags) {
+        if (!this.tagsIndex.has(tag)) this.tagsIndex.set(tag, new Set());
+        this.tagsIndex.get(tag)!.add(path);
+      }
+
+      for (const targets of this.backlinksIndex.values()) {
+        targets.delete(path);
+      }
+      for (const linkName of wikiLinks) {
+        const target = this.findFileByName(linkName);
+        if (target) {
+          if (!this.backlinksIndex.has(target)) this.backlinksIndex.set(target, new Set());
+          this.backlinksIndex.get(target)!.add(path);
+        }
+      }
+
       this.broadcast({ type: 'update', path, html, toc, frontmatter });
     });
 
@@ -194,6 +322,16 @@ export class ServerAgent {
     });
 
     await this.tryListen();
+  }
+
+  private findFileByName(name: string): string | null {
+    const nameWithExt = name.toLowerCase().endsWith('.md') ? name.toLowerCase() : name.toLowerCase() + '.md';
+    const entry = this.fileList.find(f =>
+      f.name.toLowerCase() === nameWithExt ||
+      f.relativePath.toLowerCase() === nameWithExt ||
+      f.relativePath.toLowerCase().endsWith('/' + nameWithExt)
+    );
+    return entry?.absolutePath ?? null;
   }
 
   private isSafePath(abs: string): boolean {
