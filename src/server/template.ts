@@ -307,19 +307,26 @@ export function buildHtml(
     /* ── Graph View ───────────────────────────── */
     #graph-overlay {
       display:none; position:fixed; inset:0; z-index:2000;
-      background:var(--bg); flex-direction:column;
+      background:var(--code-bg); flex-direction:column;
     }
     #graph-overlay.open { display:flex; }
     #graph-header {
-      display:flex; align-items:center; padding:12px 16px;
+      display:flex; align-items:center; padding:10px 16px;
       border-bottom:1px solid var(--border); background:var(--hdr-bg); color:var(--hdr-fg);
-      flex-shrink:0;
+      flex-shrink:0; gap:8px;
     }
-    #graph-canvas { flex:1; width:100%; }
-    #graph-hint { padding:8px 16px; font-size:11px; color:var(--muted);
-                  text-align:center; border-top:1px solid var(--border); }
+    #graph-canvas { flex:1; width:100%; cursor:grab; }
+    #graph-canvas:active { cursor:grabbing; }
+    #graph-hint { padding:6px 16px; font-size:11px; color:var(--muted);
+                  text-align:center; border-top:1px solid var(--border);
+                  display:flex; justify-content:center; gap:16px; }
+    #graph-hint span { opacity:.7; }
     #graph-close { background:none; border:none; color:var(--hdr-fg);
-                   font-size:20px; cursor:pointer; padding:4px 8px; }
+                   font-size:20px; cursor:pointer; padding:4px 8px; margin-left:auto; opacity:.7; }
+    #graph-close:hover { opacity:1; }
+    #graph-legend { display:flex; gap:12px; font-size:11px; align-items:center; opacity:.7; }
+    .gleg { display:inline-flex; align-items:center; gap:4px; }
+    .gleg-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
     /* ── New File Modal ───────────────────────── */
     #newfile-modal {
@@ -466,12 +473,22 @@ export function buildHtml(
   <!-- ── Graph Overlay ── -->
   <div id="graph-overlay">
     <div id="graph-header">
-      <span style="font-weight:700">노트 그래프</span>
-      <span id="graph-stats" style="opacity:.5;font-size:12px;margin-left:12px"></span>
-      <button id="graph-close" style="margin-left:auto" onclick="closeGraph()">×</button>
+      <span style="font-weight:700;font-size:14px">◉ 노트 그래프</span>
+      <span id="graph-stats" style="opacity:.5;font-size:12px"></span>
+      <div id="graph-legend">
+        <span class="gleg"><span class="gleg-dot" style="background:var(--accent)"></span>현재</span>
+        <span class="gleg"><span class="gleg-dot" style="background:#58a6ff"></span>연결됨</span>
+        <span class="gleg"><span class="gleg-dot" style="background:#8b949e"></span>독립</span>
+      </div>
+      <button id="graph-close" onclick="closeGraph()">×</button>
     </div>
     <svg id="graph-canvas"></svg>
-    <div id="graph-hint">스크롤: 줌 · 드래그: 이동 · 노드 클릭: 파일 열기</div>
+    <div id="graph-hint">
+      <span>🖱 스크롤: 줌</span>
+      <span>✋ 드래그: 이동</span>
+      <span>👆 노드 클릭: 파일 열기</span>
+      <span>Esc: 닫기</span>
+    </div>
   </div>
 
   <!-- ── New File Modal ── -->
@@ -507,114 +524,167 @@ export function buildHtml(
       var statsEl = document.getElementById('graph-stats');
       if (!svgEl) return;
 
-      // Clear previous render
       while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
 
       var W = svgEl.clientWidth || 800;
       var H = svgEl.clientHeight || 600;
 
-      // Compute in-degree
-      var inDeg = {};
-      nodes.forEach(function(n) { inDeg[n.id] = 0; });
-      edges.forEach(function(e) {
-        var tid = (e.target && typeof e.target === 'object') ? e.target.id : e.target;
-        if (inDeg[tid] !== undefined) inDeg[tid]++;
-      });
-
-      var isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark'
+      var isDark = document.documentElement.getAttribute('data-theme') === 'dark'
         || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme:dark)').matches);
 
-      var accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0969da';
-      var mutedColor  = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() || '#8b949e';
+      // degree map
+      var deg = {};
+      nodes.forEach(function(n) { deg[n.id] = 0; });
+      edges.forEach(function(e) {
+        var s = typeof e.source === 'object' ? e.source.id : e.source;
+        var t = typeof e.target === 'object' ? e.target.id : e.target;
+        if (deg[s] !== undefined) deg[s]++;
+        if (deg[t] !== undefined) deg[t]++;
+      });
+
+      var C_CURRENT = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#0969da';
+      var C_LINKED  = isDark ? '#58a6ff' : '#1f6feb';
+      var C_SOLO    = isDark ? '#484f58' : '#cdd5de';
+      var C_EDGE    = isDark ? '#3d444d' : '#c5cfd8';
+      var C_EDGE_HL = isDark ? '#79c0ff' : '#0969da';
+      var C_TEXT    = isDark ? '#cdd9e5' : '#1f2328';
+      var C_BG_DOT  = isDark ? '#2a3038' : '#dce3ea';
 
       function nodeColor(n) {
-        if (n.relativePath === currentRelPath) return accentColor;
-        if ((inDeg[n.id] || 0) > 0) return isDarkMode ? '#1f6feb' : '#58a6ff';
-        return mutedColor;
+        if (n.relativePath === currentRelPath) return C_CURRENT;
+        return (deg[n.id] || 0) > 0 ? C_LINKED : C_SOLO;
       }
-      function nodeRadius(n) {
-        return Math.min(15, 5 + (inDeg[n.id] || 0) * 2);
+      function nodeR(n) {
+        var d = deg[n.id] || 0;
+        return Math.max(5, Math.min(18, 6 + d * 2.5));
       }
 
-      if (statsEl) statsEl.textContent = nodes.length + '개 노드 · ' + edges.length + '개 링크';
+      if (statsEl) statsEl.textContent = nodes.length + '개 노트 · ' + edges.length + '개 링크';
 
       var svg = d3.select(svgEl).attr('width', W).attr('height', H);
-      var g = svg.append('g');
 
-      var zoom = d3.zoom().scaleExtent([0.1, 10])
-        .on('zoom', function(event) { g.attr('transform', event.transform); });
+      // dot grid background
+      var defs = svg.append('defs');
+      defs.append('pattern').attr('id','dotgrid').attr('width',24).attr('height',24)
+        .attr('patternUnits','userSpaceOnUse')
+        .append('circle').attr('cx',1).attr('cy',1).attr('r',1).attr('fill', C_BG_DOT);
+
+      // glow filter
+      var flt = defs.append('filter').attr('id','glow').attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+      flt.append('feGaussianBlur').attr('stdDeviation',3).attr('result','blur');
+      var fltMerge = flt.append('feMerge');
+      fltMerge.append('feMergeNode').attr('in','blur');
+      fltMerge.append('feMergeNode').attr('in','SourceGraphic');
+
+      // arrow marker
+      defs.append('marker').attr('id','arrow').attr('viewBox','0 -4 8 8').attr('refX',14).attr('refY',0)
+        .attr('markerWidth',6).attr('markerHeight',6).attr('orient','auto')
+        .append('path').attr('d','M0,-4L8,0L0,4').attr('fill', C_EDGE).attr('opacity',0.8);
+
+      svg.append('rect').attr('width',W).attr('height',H).attr('fill','url(#dotgrid)');
+
+      var g = svg.append('g');
+      var zoom = d3.zoom().scaleExtent([0.08, 12])
+        .on('zoom', function(ev) { g.attr('transform', ev.transform); });
       svg.call(zoom);
 
-      // Deep copy nodes for simulation
       var simNodes = nodes.map(function(n) { return Object.assign({}, n); });
       var simEdges = edges.map(function(e) { return {source: e.source, target: e.target}; });
 
+      var linkDist = Math.max(80, Math.min(180, 500 / Math.max(nodes.length, 1)));
+      var repulse  = Math.max(-350, -60 * Math.sqrt(Math.max(nodes.length, 1)));
+
       var sim = d3.forceSimulation(simNodes)
-        .force('link', d3.forceLink(simEdges).id(function(d) { return d.id; }).distance(80).strength(0.5))
-        .force('charge', d3.forceManyBody().strength(-120))
+        .force('link', d3.forceLink(simEdges).id(function(d) { return d.id; }).distance(linkDist).strength(0.6))
+        .force('charge', d3.forceManyBody().strength(repulse))
         .force('center', d3.forceCenter(W / 2, H / 2))
-        .alphaDecay(0.05);
+        .force('collision', d3.forceCollide().radius(function(d) { return nodeR(d) + 8; }))
+        .alphaDecay(0.03);
 
-      setTimeout(function() { sim.stop(); }, 5000);
+      setTimeout(function() { sim.stop(); }, 8000);
 
-      var linkSel = g.append('g')
-        .attr('stroke', isDarkMode ? '#30363d' : '#d0d7de')
-        .attr('stroke-opacity', 0.7)
-        .selectAll('line').data(simEdges).join('line').attr('stroke-width', 1);
+      // edges
+      var linkSel = g.append('g').selectAll('line').data(simEdges).join('line')
+        .attr('stroke', C_EDGE)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-opacity', 0.6)
+        .attr('marker-end', 'url(#arrow)');
 
-      var nodeSel = g.append('g')
-        .selectAll('g').data(simNodes).join('g')
+      // nodes
+      var nodeSel = g.append('g').selectAll('g').data(simNodes).join('g')
         .call(d3.drag()
-          .on('start', function(event, d) {
-            if (!event.active) sim.alphaTarget(0.3).restart();
-            d.fx = d.x; d.fy = d.y;
-          })
-          .on('drag', function(event, d) { d.fx = event.x; d.fy = event.y; })
-          .on('end', function(event, d) {
-            if (!event.active) sim.alphaTarget(0);
-            d.fx = null; d.fy = null;
-          }));
+          .on('start', function(ev, d) { if (!ev.active) sim.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; })
+          .on('drag',  function(ev, d) { d.fx=ev.x; d.fy=ev.y; })
+          .on('end',   function(ev, d) { if (!ev.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+
+      // outer glow ring for current file
+      nodeSel.filter(function(d) { return d.relativePath === currentRelPath; })
+        .append('circle')
+        .attr('r', function(d) { return nodeR(d) + 5; })
+        .attr('fill', 'none')
+        .attr('stroke', C_CURRENT)
+        .attr('stroke-width', 1.5)
+        .attr('opacity', 0.4)
+        .attr('filter', 'url(#glow)');
 
       var circles = nodeSel.append('circle')
-        .attr('r', nodeRadius)
+        .attr('r', nodeR)
         .attr('fill', nodeColor)
-        .attr('stroke', isDarkMode ? '#0d1117' : '#fff')
-        .attr('stroke-width', 1.5)
+        .attr('stroke', isDark ? '#1c2128' : '#fff')
+        .attr('stroke-width', 2)
         .style('cursor', 'pointer')
-        .on('click', function(event, d) {
+        .on('click', function(ev, d) {
           if (window.closeGraph) window.closeGraph();
           if (window.__loadFile) window.__loadFile(d.relativePath, d.absolutePath);
         })
-        .on('mouseover', function(event, d) {
+        .on('mouseover', function(ev, d) {
           var conn = new Set([d.id]);
           simEdges.forEach(function(e) {
-            var s = (e.source && typeof e.source === 'object') ? e.source.id : e.source;
-            var t = (e.target && typeof e.target === 'object') ? e.target.id : e.target;
-            if (s === d.id) conn.add(t);
-            if (t === d.id) conn.add(s);
+            var s = (e.source && typeof e.source==='object') ? e.source.id : e.source;
+            var t = (e.target && typeof e.target==='object') ? e.target.id : e.target;
+            if (s===d.id) conn.add(t);
+            if (t===d.id) conn.add(s);
           });
-          circles.attr('opacity', function(nd) { return conn.has(nd.id) ? 1 : 0.2; });
-          linkSel.attr('opacity', function(e) {
-            var s = (e.source && typeof e.source === 'object') ? e.source.id : e.source;
-            var t = (e.target && typeof e.target === 'object') ? e.target.id : e.target;
-            return s === d.id || t === d.id ? 1 : 0.1;
-          });
-          labels.attr('opacity', function(nd) { return conn.has(nd.id) ? 1 : 0; });
+          circles.attr('opacity', function(nd) { return conn.has(nd.id) ? 1 : 0.15; });
+          linkSel
+            .attr('stroke', function(e) {
+              var s=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+              var t=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+              return (s===d.id||t===d.id) ? C_EDGE_HL : C_EDGE;
+            })
+            .attr('stroke-width', function(e) {
+              var s=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+              var t=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+              return (s===d.id||t===d.id) ? 2.5 : 1.5;
+            })
+            .attr('stroke-opacity', function(e) {
+              var s=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+              var t=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+              return (s===d.id||t===d.id) ? 1 : 0.08;
+            });
+          labels.attr('opacity', function(nd) { return conn.has(nd.id) ? 1 : 0; })
+                .attr('font-weight', function(nd) { return nd.id===d.id ? 'bold' : 'normal'; });
         })
         .on('mouseout', function() {
           circles.attr('opacity', 1);
-          linkSel.attr('opacity', 0.7);
-          labels.attr('opacity', function(d) { return nodeRadius(d) > 7 ? 0.8 : 0; });
+          linkSel.attr('stroke', C_EDGE).attr('stroke-width', 1.5).attr('stroke-opacity', 0.6);
+          labels.attr('opacity', function(d) { return (deg[d.id]||0) > 0 ? 0.85 : 0.5; })
+                .attr('font-weight', 'normal');
         });
 
       var labels = nodeSel.append('text')
-        .attr('dx', function(d) { return nodeRadius(d) + 3; })
         .attr('dy', '0.35em')
-        .attr('font-size', '10px')
-        .attr('fill', isDarkMode ? '#e6edf3' : '#24292f')
+        .attr('font-size', function(d) { return (deg[d.id]||0) > 2 ? '11px' : '10px'; })
+        .attr('font-family', 'var(--font-ui, system-ui)')
+        .attr('fill', C_TEXT)
         .attr('pointer-events', 'none')
-        .attr('opacity', function(d) { return nodeRadius(d) > 7 ? 0.8 : 0; })
-        .text(function(d) { return d.label || d.id; });
+        .attr('text-anchor', 'middle')
+        .attr('y', function(d) { return nodeR(d) + 12; })
+        .attr('opacity', function(d) { return (deg[d.id]||0) > 0 ? 0.85 : 0.5; })
+        .text(function(d) { var l = d.label || d.id; return l.length > 18 ? l.slice(0,16) + '…' : l; });
+
+      // tooltip title
+      nodeSel.append('title').text(function(d) { return (d.label || d.id) + ' (' + (deg[d.id]||0) + ' 연결)'; });
 
       sim.on('tick', function() {
         linkSel
@@ -623,6 +693,20 @@ export function buildHtml(
           .attr('x2', function(d) { return d.target.x; })
           .attr('y2', function(d) { return d.target.y; });
         nodeSel.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+      });
+
+      // fit to view after initial layout
+      sim.on('end', function() {
+        if (!simNodes.length) return;
+        var minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+        simNodes.forEach(function(n) {
+          if(n.x<minX) minX=n.x; if(n.y<minY) minY=n.y;
+          if(n.x>maxX) maxX=n.x; if(n.y>maxY) maxY=n.y;
+        });
+        var pad=60, bW=maxX-minX+pad*2, bH=maxY-minY+pad*2;
+        var k=Math.min(W/bW, H/bH, 1.5);
+        var tx=(W-(maxX+minX)*k)/2, ty=(H-(maxY+minY)*k)/2;
+        svg.call(zoom.transform, d3.zoomIdentity.translate(tx,ty).scale(k));
       });
     };
   </script>
