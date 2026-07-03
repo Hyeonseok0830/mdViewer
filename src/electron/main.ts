@@ -29,7 +29,8 @@ function getKatexPath(): string {
 // ── 창 생성 ─────────────────────────────────────────────────
 function getIconPath(): string {
   const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-  if (app.isPackaged) return join(process.resourcesPath, 'app.asar.unpacked', 'assets', file);
+  // extraResources로 복사된 파일은 app.asar 바깥 process.resourcesPath 에 위치
+  if (app.isPackaged) return join(process.resourcesPath, 'assets', file);
   return join(__dirname, '../../../assets', file);
 }
 
