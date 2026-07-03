@@ -68,6 +68,8 @@
     "files": [
       "dist/**/*",
       "package.json",
+      "assets/icon.png",
+      "assets/icon.ico",
       "node_modules/**/*",
       "!node_modules/electron{,/**}",
       "!node_modules/electron-builder{,/**}",
@@ -81,10 +83,6 @@
     "asarUnpack": [
       "**/node_modules/katex/dist/**",
       "**/node_modules/shiki/**"
-    ],
-    "extraResources": [
-      { "from": "assets/icon.ico", "to": "assets/icon.ico" },
-      { "from": "assets/icon.png", "to": "assets/icon.png" }
     ],
     "win": {
       "icon": "assets/icon.png",

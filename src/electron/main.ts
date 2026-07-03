@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
+import { app, BrowserWindow, dialog, Menu, shell, nativeImage, type NativeImage } from 'electron';
 import { stat } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
@@ -27,11 +27,19 @@ function getKatexPath(): string {
 }
 
 // ── 창 생성 ─────────────────────────────────────────────────
-function getIconPath(): string {
-  const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-  // extraResources로 복사된 파일은 app.asar 바깥 process.resourcesPath 에 위치
-  if (app.isPackaged) return join(process.resourcesPath, 'assets', file);
-  return join(__dirname, '../../../assets', file);
+function createAppIcon(): NativeImage {
+  // asar 내부에 포함된 icon 파일을 Buffer로 읽어 nativeImage 생성.
+  // nativeImage.createFromPath()는 asar 경로를 지원하지 않지만
+  // readFileSync()는 Electron의 fs 패치 덕에 asar 경로를 투명하게 읽는다.
+  try {
+    const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+    const iconPath = app.isPackaged
+      ? join(app.getAppPath(), 'assets', file)   // asar 내부 (패키지 모드)
+      : join(__dirname, '../../../assets', file); // 개발 모드
+    return nativeImage.createFromBuffer(readFileSync(iconPath));
+  } catch {
+    return nativeImage.createEmpty();
+  }
 }
 
 function createWindow(): BrowserWindow {
@@ -41,7 +49,7 @@ function createWindow(): BrowserWindow {
     minWidth: 700,
     minHeight: 500,
     title: 'MdPad',
-    icon: getIconPath(),
+    icon: createAppIcon(),
     show: false,
     backgroundColor: '#0d1117',
     webPreferences: {
