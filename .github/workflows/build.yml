@@ -75,6 +75,7 @@ jobs:
             release/*.exe
             release/*.appx
             release/*.msix
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -116,6 +117,7 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           files: release/*.dmg
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -166,5 +168,6 @@ jobs:
           files: |
             release/*.AppImage
             release/*.deb
+          overwrite: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
