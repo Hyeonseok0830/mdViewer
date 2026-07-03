@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, Menu, shell, nativeImage, type NativeImage 
 import { stat } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
+import { ICON_PNG_512_B64 } from './icon-data.js';
 import { fileURLToPath } from 'node:url';
 import { bus } from '../bus.js';
 import { FileAgent } from '../agents/FileAgent.js';
@@ -28,18 +29,8 @@ function getKatexPath(): string {
 
 // ── 창 생성 ─────────────────────────────────────────────────
 function createAppIcon(): NativeImage {
-  // asar 내부에 포함된 icon 파일을 Buffer로 읽어 nativeImage 생성.
-  // nativeImage.createFromPath()는 asar 경로를 지원하지 않지만
-  // readFileSync()는 Electron의 fs 패치 덕에 asar 경로를 투명하게 읽는다.
-  try {
-    const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
-    const iconPath = app.isPackaged
-      ? join(app.getAppPath(), 'assets', file)   // asar 내부 (패키지 모드)
-      : join(__dirname, '../../../assets', file); // 개발 모드
-    return nativeImage.createFromBuffer(readFileSync(iconPath));
-  } catch {
-    return nativeImage.createEmpty();
-  }
+  // PNG를 base64로 소스에 임베드 → 파일 시스템 경로 의존 없음
+  return nativeImage.createFromDataURL('data:image/png;base64,' + ICON_PNG_512_B64);
 }
 
 function createWindow(): BrowserWindow {
