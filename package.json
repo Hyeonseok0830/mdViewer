@@ -132,7 +132,7 @@
       ]
     },
     "linux": {
-      "icon": "assets/icon.png",
+      "icon": "assets/icon.svg",
       "target": [
         {
           "target": "AppImage",
