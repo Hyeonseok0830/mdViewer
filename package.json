@@ -81,7 +81,8 @@
     "asarUnpack": [
       "**/node_modules/katex/dist/**",
       "**/node_modules/shiki/**",
-      "assets/icon.ico"
+      "assets/icon.ico",
+      "assets/icon.png"
     ],
     "win": {
       "icon": "assets/icon.png",

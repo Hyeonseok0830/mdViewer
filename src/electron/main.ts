@@ -28,8 +28,9 @@ function getKatexPath(): string {
 
 // ── 창 생성 ─────────────────────────────────────────────────
 function getIconPath(): string {
-  if (app.isPackaged) return join(process.resourcesPath, 'app.asar.unpacked', 'assets', 'icon.ico');
-  return join(__dirname, '../../../assets/icon.ico');
+  const file = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+  if (app.isPackaged) return join(process.resourcesPath, 'app.asar.unpacked', 'assets', file);
+  return join(__dirname, '../../../assets', file);
 }
 
 function createWindow(): BrowserWindow {
