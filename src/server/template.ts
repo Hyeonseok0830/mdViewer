@@ -799,6 +799,16 @@ export function buildHtml(
   <script id="mdv-config" type="application/json">${configJson}</script>
 
   <script>
+  window.onerror = function(msg, src, line, col, err) {
+    var st = document.getElementById('status-text');
+    if (st) st.textContent = '스크립트 오류: ' + msg + ' (' + (src||'').split('/').pop() + ':' + line + ')';
+    var dot = document.getElementById('dot');
+    if (dot) dot.className = 'dot off';
+    return false;
+  };
+  </script>
+
+  <script>
   (function(){
     /* ── 요소 ────────────────────────── */
     var mdEl         = document.getElementById('markdown');
