@@ -20,11 +20,18 @@ function getKatexPath(): string {
   if (!app.isPackaged) {
     return join(__dirname, '../../../node_modules/katex/dist');
   }
-  // asar 빌드: node_modules가 app.asar.unpacked에 있음
   const asarUnpacked = join(process.resourcesPath, 'app.asar.unpacked', 'node_modules', 'katex', 'dist');
   if (existsSync(asarUnpacked)) return asarUnpacked;
-  // asar 비활성화 빌드: resources/app/ 에 직접 있음
   return join(process.resourcesPath, 'app', 'node_modules', 'katex', 'dist');
+}
+
+function getVendorPath(): string {
+  if (!app.isPackaged) {
+    return join(__dirname, '../../../assets/vendor');
+  }
+  const asarUnpacked = join(process.resourcesPath, 'app.asar.unpacked', 'assets', 'vendor');
+  if (existsSync(asarUnpacked)) return asarUnpacked;
+  return join(process.resourcesPath, 'app', 'assets', 'vendor');
 }
 
 // ── 창 생성 ─────────────────────────────────────────────────
@@ -187,7 +194,7 @@ async function startServer(inputPath: string): Promise<void> {
   const fileAgent = new FileAgent(inputPath);
   watchAgent = new WatchAgent(inputPath);
   const renderAgent = new RenderAgent();
-  serverAgent = new ServerAgent(3000, rootDir, isDir, getKatexPath());
+  serverAgent = new ServerAgent(3000, rootDir, isDir, getKatexPath(), getVendorPath());
   serverAgent.setRenderAgent(renderAgent);
 
   bus.typedOn('server:ready', ({ url }) => {

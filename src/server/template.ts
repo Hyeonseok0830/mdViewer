@@ -585,20 +585,25 @@ export function buildHtml(
   <!-- ── Link Autocomplete ── -->
   <div id="link-autocomplete"></div>
 
-  <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    const dark = ()=>document.documentElement.getAttribute('data-theme')==='dark'
-      ||(!document.documentElement.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);
-    window.__mermaidInit=d=>mermaid.initialize({startOnLoad:false,theme:d?'dark':'default'});
-    window.__mermaidRender=async()=>{const n=document.querySelectorAll('.mermaid:not([data-processed])');if(n.length)await mermaid.run({nodes:n});};
-    window.__mermaidInit(dark());
-    window.__mermaidRender();
+  <script src="/vendor/mermaid.min.js"></script>
+  <script>
+    (function(){
+      var dark = function(){ return document.documentElement.getAttribute('data-theme')==='dark'
+        ||(!document.documentElement.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches); };
+      if(typeof mermaid !== 'undefined'){
+        window.__mermaidInit=function(d){ mermaid.initialize({startOnLoad:false,theme:d?'dark':'default'}); };
+        window.__mermaidRender=async function(){ var n=document.querySelectorAll('.mermaid:not([data-processed])');if(n.length)await mermaid.run({nodes:n}); };
+        window.__mermaidInit(dark());
+        window.__mermaidRender();
+      }
+    })();
   </script>
 
-  <script type="module">
-    import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
-
-    window.__renderGraph = function(nodes, edges, currentRelPath) {
+  <script src="/vendor/d3.min.js"></script>
+  <script>
+    window.__renderGraph = (function() {
+      if (typeof d3 === 'undefined') return function(){};
+      return function(nodes, edges, currentRelPath) {
       var svgEl = document.getElementById('graph-canvas');
       var statsEl = document.getElementById('graph-stats');
       if (!svgEl) return;
@@ -787,7 +792,8 @@ export function buildHtml(
         var tx=(W-(maxX+minX)*k)/2, ty=(H-(maxY+minY)*k)/2;
         svg.call(zoom.transform, d3.zoomIdentity.translate(tx,ty).scale(k));
       });
-    };
+      };
+    })();
   </script>
 
   <script id="mdv-config" type="application/json">${configJson}</script>

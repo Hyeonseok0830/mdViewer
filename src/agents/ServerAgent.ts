@@ -10,7 +10,8 @@ import { buildHtml } from '../server/template.js';
 import type { RenderAgent } from './RenderAgent.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_KATEX_DIST = resolve(__dirname, '../../node_modules/katex/dist');
+const DEFAULT_KATEX_DIST  = resolve(__dirname, '../../node_modules/katex/dist');
+const DEFAULT_VENDOR_DIR  = resolve(__dirname, '../../../assets/vendor');
 
 interface RenderCache {
   html: string;
@@ -45,6 +46,7 @@ export class ServerAgent {
     private rootDir: string = '',
     private isDir: boolean = false,
     private katexPath: string = DEFAULT_KATEX_DIST,
+    private vendorPath: string = DEFAULT_VENDOR_DIR,
   ) {
     this.fileListReady = new Promise((resolve) => { this.resolveFileList = resolve; });
   }
@@ -57,6 +59,12 @@ export class ServerAgent {
     await this.app.register(fastifyStatic, {
       root: this.katexPath,
       prefix: '/katex/',
+    });
+
+    await this.app.register(fastifyStatic, {
+      root: this.vendorPath,
+      prefix: '/vendor/',
+      decorateReply: false,
     });
 
     await this.app.register(fastifyWebSocket);
