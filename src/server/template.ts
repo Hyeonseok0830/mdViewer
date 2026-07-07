@@ -1512,7 +1512,7 @@ export function buildHtml(
     }
 
     /* ── Wiki Preview Popup ──────────────── */
-    {
+    (function() {
       var popup    = document.getElementById('wiki-preview-popup');
       var wpTitle  = document.getElementById('wp-title');
       var wpBody   = document.getElementById('wp-body');
@@ -1700,7 +1700,7 @@ export function buildHtml(
       document.addEventListener('click', function(e) {
         if (lac && !lac.contains(e.target)) closeLac();
       });
-    }
+    })();
 
     /* ── New File Modal ──────────────── */
     function openNewFile() {
