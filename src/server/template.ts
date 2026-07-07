@@ -234,6 +234,25 @@ export function buildHtml(
     .wiki-link { color:var(--accent);text-decoration:none;border-bottom:1px dashed currentColor;opacity:.85; }
     .wiki-link:hover { opacity:1;border-bottom-style:solid; }
 
+    /* ── Embedded Notes (![[file]]) ───────────── */
+    .embed-note {
+      border:1px solid var(--border); border-radius:8px;
+      padding:12px 16px; margin:12px 0;
+      background:var(--code-bg); position:relative;
+    }
+    .embed-note::before {
+      content:''; display:block; position:absolute;
+      left:0; top:8px; bottom:8px; width:3px;
+      background:var(--accent); border-radius:0 2px 2px 0; opacity:.6;
+    }
+    .embed-note-title {
+      font-size:12px; font-weight:600; color:var(--muted);
+      margin-bottom:8px; text-transform:uppercase; letter-spacing:.04em;
+    }
+    .embed-note-body { font-size:.93em; }
+    .embed-note-body h1,.embed-note-body h2,.embed-note-body h3 { font-size:1em; margin:.4em 0; }
+    .embed-note-loading { color:var(--muted); font-style:italic; font-size:.9em; }
+
     /* ── Heading Fold ─────────────────────────── */
     .fold-toggle {
       display:inline-block; cursor:pointer; user-select:none;
@@ -934,7 +953,7 @@ export function buildHtml(
         var d=await res.json();
         mdEl.innerHTML=d.html;
         if (window.__mermaidRender) window.__mermaidRender();
-        applyFoldButtons();
+        applyFoldButtons(); if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
         renderToc(d.toc);
       } catch(err) {}
     }
@@ -1061,7 +1080,7 @@ export function buildHtml(
         var anchor = saveAnchor();
         mdEl.innerHTML = d.html;
         if (window.__mermaidRender) window.__mermaidRender();
-        applyFoldButtons();
+        applyFoldButtons(); if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
         renderToc(d.toc);
         renderFm(d.frontmatter);
         restoreAnchor(anchor);
@@ -1745,7 +1764,7 @@ export function buildHtml(
           var anchor = saveAnchor();
           mdEl.innerHTML = msg.html;
           if (window.__mermaidRender) window.__mermaidRender();
-          applyFoldButtons();
+          applyFoldButtons(); if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
           renderToc(msg.toc);
           renderFm(msg.frontmatter);
           restoreAnchor(anchor);
@@ -1783,7 +1802,28 @@ export function buildHtml(
     connect();
     loadTags();
     loadBookmarks();
-    if (mdEl && mdEl.innerHTML.trim()) applyFoldButtons();
+    if (mdEl && mdEl.innerHTML.trim()) { applyFoldButtons(); loadEmbeds(mdEl); }
+
+    /* ── Embedded Notes 로딩 ─────────────────────── */
+    function loadEmbeds(container) {
+      var embeds = container.querySelectorAll('.embed-note[data-embed]');
+      embeds.forEach(function(el) {
+        var fname = el.getAttribute('data-embed');
+        if (!fname || el.dataset.loaded) return;
+        el.dataset.loaded = '1';
+        el.innerHTML = '<span class="embed-note-loading">⏳ ' + esc(fname) + ' 로딩 중...</span>';
+        fetch('/api/render?file=' + encodeURIComponent(fname))
+          .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+          .then(function(d) {
+            var title = fname.replace(/\.md$/i,'');
+            el.innerHTML =
+              '<div class="embed-note-title">📄 ' + esc(title) + '</div>' +
+              '<div class="embed-note-body">' + (d.html || '') + '</div>';
+          })
+          .catch(function(){ el.innerHTML = '<span class="embed-note-loading">⚠ ' + esc(fname) + ' 로드 실패</span>'; });
+      });
+    }
+    window.__loadEmbeds = loadEmbeds;
 
   })();
   </script>

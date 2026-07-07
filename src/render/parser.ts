@@ -12,6 +12,7 @@ import { rehypeMermaid } from './plugins/mermaid.js';
 import { rehypeToc } from './plugins/toc.js';
 import { rehypeCallouts } from './plugins/callouts.js';
 import { remarkWikiLinks } from './plugins/wikilinks.js';
+import { remarkEmbed } from './plugins/embed.js';
 
 // rehype-katex의 output 옵션 타입이 좁으므로 명시
 const KATEX_OPTIONS = { output: 'html' as const, throwOnError: false };
@@ -27,6 +28,7 @@ export function buildProcessor(highlighter: Highlighter) {
     .use(remarkGfm)
     .use(remarkMath)
     .use(remarkWikiLinks)
+    .use(remarkEmbed)
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeSlug)         // 헤딩에 id 추가 (rehypeToc보다 먼저)
     .use(tocPlugin)          // toc 추출 (slug가 붙은 뒤)

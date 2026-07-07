@@ -233,6 +233,39 @@ export class ServerAgent {
       return { wordCount: this.wordCounts.get(abs) ?? 0 };
     });
 
+    // ── 미리보기 API ──────────────────────────────────
+    this.app.get('/api/preview', async (req, reply) => {
+      const rel = (req.query as Record<string, string>).file;
+      if (!rel) return reply.code(400).send({ error: 'file 파라미터가 필요합니다' });
+      const abs = resolve(this.rootDir, rel);
+      if (!this.isSafePath(abs)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+
+      let html: string;
+
+      if (this.renders.has(abs)) {
+        // Already cached — return truncated version for hover preview
+        html = this.renders.get(abs)!.html.slice(0, 2000);
+      } else {
+        // Not cached yet — render on demand
+        if (!this.renderAgent) return reply.code(503).send({ error: 'RenderAgent이 준비되지 않았습니다' });
+        try {
+          const raw = await readFile(abs, 'utf-8');
+          const result = await this.renderAgent.renderRaw(raw);
+          html = result.html.slice(0, 2000);
+        } catch (err) {
+          return reply.code(404).send({ error: (err as Error).message });
+        }
+      }
+
+      // Extract title from the first <h1> tag, or fall back to the filename
+      const h1Match = /<h1[^>]*>(.*?)<\/h1>/i.exec(html);
+      const title = h1Match
+        ? h1Match[1].replace(/<[^>]+>/g, '')
+        : basename(rel).replace(/\.md$/i, '');
+
+      return { html, title };
+    });
+
     // ── 파일 생성 API ─────────────────────────────────
     this.app.post('/api/files/new', async (req, reply) => {
       if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
@@ -315,7 +348,6 @@ export class ServerAgent {
       }
 
       this.broadcast({ type: 'update', path, html, toc, frontmatter });
-      if (wikiLinks.length > 0) this.broadcast({ type: 'graph:update' });
     });
 
     bus.typedOn('render:error', ({ error, path }) => {
