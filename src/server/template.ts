@@ -328,6 +328,53 @@ export function buildHtml(
     .gleg { display:inline-flex; align-items:center; gap:4px; }
     .gleg-dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
+    /* ── Wiki Preview Popup ──────────────────── */
+    #wiki-preview-popup {
+      display:none; position:fixed; z-index:3000;
+      max-width:380px; max-height:300px; overflow:hidden;
+      background:var(--bg); color:var(--fg);
+      border:1px solid var(--border); border-radius:8px;
+      box-shadow:0 8px 32px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+      pointer-events:none;
+    }
+    #wiki-preview-popup.visible { display:block; }
+    #wiki-preview-popup .wp-title {
+      font-weight:700; font-size:13px; padding:10px 14px 6px;
+      border-bottom:1px solid var(--border); color:var(--fg);
+    }
+    #wiki-preview-popup .wp-body {
+      padding:8px 14px 12px; font-size:12px; line-height:1.6;
+      color:var(--muted); overflow:hidden; max-height:240px;
+    }
+    #wiki-preview-popup .wp-body p { margin:0 0 6px; }
+    #wiki-preview-popup .wp-body h1,
+    #wiki-preview-popup .wp-body h2,
+    #wiki-preview-popup .wp-body h3 { font-size:12px; margin:0 0 4px; color:var(--fg); }
+
+    /* ── Link Autocomplete ───────────────────── */
+    #link-autocomplete {
+      display:none; position:fixed; z-index:3000;
+      background:var(--bg); border:1px solid var(--border); border-radius:6px;
+      box-shadow:0 8px 24px rgba(0,0,0,.18); overflow:hidden;
+      min-width:220px; max-width:340px;
+    }
+    #link-autocomplete.visible { display:block; }
+    .lac-item {
+      padding:7px 12px; cursor:pointer; font-size:13px;
+      color:var(--fg); border-left:3px solid transparent;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .lac-item:hover, .lac-item.active { background:rgba(88,166,255,.12); border-left-color:var(--accent); }
+
+    /* ── Graph Filter Buttons ────────────────── */
+    .graph-filter-btn {
+      background:none; border:1px solid var(--border); cursor:pointer;
+      color:var(--hdr-fg); padding:3px 10px; border-radius:5px;
+      font-size:12px; opacity:.65; transition:opacity .15s, background .15s;
+    }
+    .graph-filter-btn:hover { opacity:1; background:rgba(255,255,255,.1); }
+    .graph-filter-btn.active { opacity:1; background:var(--accent); border-color:var(--accent); color:#fff; }
+
     /* ── New File Modal ───────────────────────── */
     #newfile-modal {
       display:none; position:fixed; inset:0; z-index:2000;
@@ -475,6 +522,10 @@ export function buildHtml(
     <div id="graph-header">
       <span style="font-weight:700;font-size:14px">◉ 노트 그래프</span>
       <span id="graph-stats" style="opacity:.5;font-size:12px"></span>
+      <div style="display:flex;gap:4px">
+        <button class="graph-filter-btn active" id="graph-filter-all" onclick="setGraphFilter('all')">전체</button>
+        <button class="graph-filter-btn" id="graph-filter-local" onclick="setGraphFilter('local')">현재 노트</button>
+      </div>
       <div id="graph-legend">
         <span class="gleg"><span class="gleg-dot" style="background:var(--accent)"></span>현재</span>
         <span class="gleg"><span class="gleg-dot" style="background:#58a6ff"></span>연결됨</span>
@@ -505,6 +556,15 @@ export function buildHtml(
       </div>
     </div>
   </div>
+
+  <!-- ── Wiki Preview Popup ── -->
+  <div id="wiki-preview-popup">
+    <div class="wp-title" id="wp-title"></div>
+    <div class="wp-body" id="wp-body"></div>
+  </div>
+
+  <!-- ── Link Autocomplete ── -->
+  <div id="link-autocomplete"></div>
 
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
@@ -1392,15 +1452,236 @@ export function buildHtml(
     window.openGraph = openGraph;
     window.closeGraph = closeGraph;
 
+    var graphFilter = 'all';
+
+    window.setGraphFilter = function(mode) {
+      graphFilter = mode;
+      document.getElementById('graph-filter-all').classList.toggle('active', mode === 'all');
+      document.getElementById('graph-filter-local').classList.toggle('active', mode === 'local');
+      loadGraph();
+    };
+
     async function loadGraph() {
       if (!window.__renderGraph) return;
       try {
         var res = await fetch('/api/graph');
         if (!res.ok) return;
         var d = await res.json();
-        window.__renderGraph(d.nodes || [], d.edges || [], currentRel);
+        var nodes = d.nodes || [];
+        var edges = d.edges || [];
+        if (graphFilter === 'local' && currentRel) {
+          var curNode = nodes.find(function(n) { return n.relativePath === currentRel; });
+          if (curNode) {
+            var neighborIds = new Set();
+            neighborIds.add(curNode.id);
+            edges.forEach(function(e) {
+              var s = typeof e.source === 'object' ? e.source.id : e.source;
+              var t = typeof e.target === 'object' ? e.target.id : e.target;
+              if (s === curNode.id) neighborIds.add(t);
+              if (t === curNode.id) neighborIds.add(s);
+            });
+            nodes = nodes.filter(function(n) { return neighborIds.has(n.id); });
+            edges = edges.filter(function(e) {
+              var s = typeof e.source === 'object' ? e.source.id : e.source;
+              var t = typeof e.target === 'object' ? e.target.id : e.target;
+              return neighborIds.has(s) && neighborIds.has(t);
+            });
+          }
+        }
+        window.__renderGraph(nodes, edges, currentRel);
       } catch(err) {}
     }
+
+    /* ── Wiki Preview Popup ──────────────── */
+    (function() {
+      var popup    = document.getElementById('wiki-preview-popup');
+      var wpTitle  = document.getElementById('wp-title');
+      var wpBody   = document.getElementById('wp-body');
+      var hoverTimer = null;
+      var currentHref = null;
+
+      function showPopup(x, y, title, html) {
+        wpTitle.textContent = title;
+        wpBody.innerHTML = html;
+        popup.classList.add('visible');
+        positionPopup(x, y);
+      }
+
+      function positionPopup(x, y) {
+        var pw = 380, ph = 300;
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var left = x + 14;
+        var top  = y + 14;
+        if (left + pw > vw - 10) left = x - pw - 10;
+        if (top  + ph > vh - 10) top  = y - ph - 10;
+        if (left < 8) left = 8;
+        if (top  < 8) top  = 8;
+        popup.style.left = left + 'px';
+        popup.style.top  = top  + 'px';
+      }
+
+      function hidePopup() {
+        clearTimeout(hoverTimer);
+        hoverTimer = null;
+        currentHref = null;
+        popup.classList.remove('visible');
+      }
+
+      if (mdEl) {
+        mdEl.addEventListener('mouseover', function(e) {
+          var a = e.target.closest ? e.target.closest('a.wiki-link') : null;
+          if (!a) return;
+          var href = a.getAttribute('href') || '';
+          var fileParam = null;
+          try {
+            var url = new URL(href, location.href);
+            fileParam = url.searchParams.get('file');
+          } catch(_) {}
+          if (!fileParam) return;
+          if (currentHref === fileParam) return;
+          clearTimeout(hoverTimer);
+          currentHref = fileParam;
+          var cx = e.clientX, cy = e.clientY;
+          hoverTimer = setTimeout(function() {
+            fetch('/api/preview?file=' + encodeURIComponent(fileParam))
+              .then(function(r) { return r.ok ? r.json() : null; })
+              .then(function(d) {
+                if (d && currentHref === fileParam) showPopup(cx, cy, d.title || fileParam, d.html || '');
+              })
+              .catch(function() {});
+          }, 400);
+        });
+
+        mdEl.addEventListener('mouseout', function(e) {
+          var a = e.target.closest ? e.target.closest('a.wiki-link') : null;
+          if (a) hidePopup();
+        });
+
+        mdEl.addEventListener('mousemove', function(e) {
+          var a = e.target.closest ? e.target.closest('a.wiki-link') : null;
+          if (a && popup.classList.contains('visible')) positionPopup(e.clientX, e.clientY);
+        });
+      }
+
+      document.addEventListener('click', function() { hidePopup(); });
+    })();
+
+    /* ── Link Autocomplete ───────────────── */
+    (function() {
+      var lac      = document.getElementById('link-autocomplete');
+      var lacIdx   = -1;
+      var lacItems = [];
+
+      function closeLac() {
+        if (lac) lac.classList.remove('visible');
+        lacIdx = -1;
+        lacItems = [];
+      }
+
+      function openLac(items, query, caretRect) {
+        if (!lac || !items.length) { closeLac(); return; }
+        lacItems = items;
+        lacIdx = -1;
+        lac.innerHTML = items.slice(0, 8).map(function(f, i) {
+          return '<div class="lac-item" data-idx="' + i + '" data-name="' + esc(f.name.replace(/\\.md$/i, '')) + '">'
+            + esc(f.name.replace(/\\.md$/i, ''))
+            + (f.relativePath !== f.name ? '<span style="opacity:.5;font-size:11px;margin-left:6px">' + esc(f.relativePath) + '</span>' : '')
+            + '</div>';
+        }).join('');
+        lac.querySelectorAll('.lac-item').forEach(function(el) {
+          el.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            insertLacItem(this.dataset.name);
+          });
+        });
+
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var left = caretRect.left;
+        var top  = caretRect.bottom + 4;
+        if (left + 340 > vw - 10) left = vw - 350;
+        if (top + 200 > vh - 10) top = caretRect.top - 200 - 4;
+        if (left < 8) left = 8;
+        lac.style.left = left + 'px';
+        lac.style.top  = top  + 'px';
+        lac.classList.add('visible');
+      }
+
+      function insertLacItem(name) {
+        if (!editor) return;
+        var pos  = editor.selectionStart;
+        var text = editor.value;
+        var before = text.slice(0, pos);
+        var after  = text.slice(pos);
+        var bracketIdx = before.lastIndexOf('[[');
+        if (bracketIdx === -1) { closeLac(); return; }
+        var newBefore = before.slice(0, bracketIdx) + '[[' + name + ']]';
+        editor.value = newBefore + after;
+        var newPos = newBefore.length;
+        editor.setSelectionRange(newPos, newPos);
+        editor.dispatchEvent(new Event('input'));
+        closeLac();
+      }
+
+      function highlightLacItem(idx) {
+        lac.querySelectorAll('.lac-item').forEach(function(el, i) {
+          el.classList.toggle('active', i === idx);
+        });
+      }
+
+      if (editor) {
+        editor.addEventListener('input', function() {
+          var pos    = editor.selectionStart;
+          var before = editor.value.slice(0, pos);
+          var last50 = before.slice(-50);
+          var m      = last50.match(/\[\[([^\]]*)$/);
+          if (!m) { closeLac(); return; }
+          var query  = m[1].toLowerCase();
+          var files  = (cfg.files || []).filter(function(f) {
+            return f.name.toLowerCase().replace(/\\.md$/i, '').indexOf(query) !== -1;
+          });
+          if (!files.length) { closeLac(); return; }
+          var rect  = editor.getBoundingClientRect();
+          var lines = before.split('\\n');
+          var lineIdx = lines.length - 1;
+          var linesBefore = lines.slice(0, lineIdx);
+          var style = window.getComputedStyle(editor);
+          var lineH = parseFloat(style.lineHeight) || 20;
+          var padT  = parseFloat(style.paddingTop)  || 0;
+          var padL  = parseFloat(style.paddingLeft)  || 0;
+          var fontSize = parseFloat(style.fontSize)  || 13;
+          var approxCharW = fontSize * 0.55;
+          var curLine = lines[lineIdx];
+          var caretX = rect.left + padL + curLine.length * approxCharW;
+          var caretY = rect.top  + padT + linesBefore.length * lineH;
+          openLac(files, query, { left: caretX, bottom: caretY + lineH, top: caretY });
+        });
+
+        editor.addEventListener('keydown', function(e) {
+          if (!lac.classList.contains('visible')) return;
+          var items = lac.querySelectorAll('.lac-item');
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            lacIdx = Math.min(lacIdx + 1, items.length - 1);
+            highlightLacItem(lacIdx);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            lacIdx = Math.max(lacIdx - 1, 0);
+            highlightLacItem(lacIdx);
+          } else if (e.key === 'Enter' || e.key === 'Tab') {
+            if (lacIdx >= 0 && items[lacIdx]) {
+              e.preventDefault();
+              insertLacItem(items[lacIdx].dataset.name);
+            }
+          } else if (e.key === 'Escape') {
+            closeLac();
+          }
+        });
+      }
+
+      document.addEventListener('click', function(e) {
+        if (lac && !lac.contains(e.target)) closeLac();
+      });
+    })();
 
     /* ── New File Modal ──────────────── */
     function openNewFile() {
@@ -1471,8 +1752,6 @@ export function buildHtml(
           if (msg.wordCount !== undefined) updateWordCount(msg.wordCount);
           if (currentRel && cfg.isDir) loadBacklinks(currentRel);
           if (currentMode !== 'view' && !modified && currentRel) { editor.value=''; loadEditorContent(currentRel); }
-        } else if (msg.type === 'graph:update') {
-          if (grOverlay && grOverlay.classList.contains('open')) loadGraph();
         } else if (msg.type === 'error') {
           statusText.textContent = '오류: ' + msg.message;
         }
