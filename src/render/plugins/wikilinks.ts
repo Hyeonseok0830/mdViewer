@@ -21,13 +21,16 @@ export function remarkWikiLinks() {
 
       while ((match = pattern.exec(value)) !== null) {
         if (match.index > lastIdx) parts.push({ type: 'text', value: value.slice(lastIdx, match.index) });
-        const name = match[1].trim();
-        links.push(name);
-        const href = '?file=' + encodeURIComponent(name.endsWith('.md') ? name : name + '.md');
+        const raw = match[1].trim();
+        const pipeIdx = raw.indexOf('|');
+        const target = pipeIdx >= 0 ? raw.slice(0, pipeIdx).trim() : raw;
+        const label  = pipeIdx >= 0 ? raw.slice(pipeIdx + 1).trim() : raw;
+        links.push(target);
+        const href = '?file=' + encodeURIComponent(target.endsWith('.md') ? target : target + '.md');
         const linkNode: Link = {
           type: 'link', url: href, title: null,
-          data: { hProperties: { 'data-wiki': 'true', class: 'wiki-link' } },
-          children: [{ type: 'text', value: name }],
+          data: { hProperties: { 'data-wiki': 'true', class: 'wiki-link', 'data-target': target } },
+          children: [{ type: 'text', value: label }],
         };
         parts.push(linkNode);
         lastIdx = match.index + match[0].length;

@@ -315,6 +315,7 @@ export class ServerAgent {
       }
 
       this.broadcast({ type: 'update', path, html, toc, frontmatter });
+      if (wikiLinks.length > 0) this.broadcast({ type: 'graph:update' });
     });
 
     bus.typedOn('render:error', ({ error, path }) => {

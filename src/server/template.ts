@@ -1471,6 +1471,8 @@ export function buildHtml(
           if (msg.wordCount !== undefined) updateWordCount(msg.wordCount);
           if (currentRel && cfg.isDir) loadBacklinks(currentRel);
           if (currentMode !== 'view' && !modified && currentRel) { editor.value=''; loadEditorContent(currentRel); }
+        } else if (msg.type === 'graph:update') {
+          if (grOverlay && grOverlay.classList.contains('open')) loadGraph();
         } else if (msg.type === 'error') {
           statusText.textContent = '오류: ' + msg.message;
         }
