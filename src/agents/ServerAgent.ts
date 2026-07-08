@@ -391,6 +391,37 @@ export class ServerAgent {
       this.contentIndex.set(path, content);
     });
 
+    bus.typedOn('file:added', async ({ path }) => {
+      if (this.fileList.find((f) => f.absolutePath === path)) return;
+      try {
+        const content = await readFile(path, 'utf-8');
+        this.fileList.push({
+          name: basename(path),
+          relativePath: this.rootDir ? relative(this.rootDir, path) : basename(path),
+          absolutePath: path,
+        });
+        this.fileList.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+        this.contentIndex.set(path, content);
+        bus.typedEmit('file:changed', { path, content });
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+      } catch {
+        /* 읽기 실패 시 무시 */
+      }
+    });
+
+    bus.typedOn('file:removed', ({ path }) => {
+      this.fileList = this.fileList.filter((f) => f.absolutePath !== path);
+      this.contentIndex.delete(path);
+      this.renders.delete(path);
+      this.wordCounts.delete(path);
+      for (const files of this.backlinksIndex.values()) files.delete(path);
+      for (const files of this.tagsIndex.values()) {
+        files.delete(path);
+        if (files.size === 0) this.tagsIndex.delete(path);
+      }
+      this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+    });
+
     bus.typedOn('render:done', ({ html, path, toc, frontmatter, tags, wordCount, wikiLinks }) => {
       this.renders.set(path, { html, toc, frontmatter: frontmatter as Record<string, unknown> });
       this.wordCounts.set(path, wordCount);

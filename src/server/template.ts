@@ -541,7 +541,10 @@ export function buildHtml(
         <div id="tree-section" class="sb-section" style="display:none">
           <div class="sb-title-row">
             <span class="sb-title">파일</span>
-            <button id="newfile-btn" title="새 파일" onclick="openNewFile()">+</button>
+            <div style="display:flex;gap:4px;align-items:center">
+              <button id="sync-btn" title="폴더 새로고침" onclick="syncFiles()">⟳</button>
+              <button id="newfile-btn" title="새 파일" onclick="openNewFile()">+</button>
+            </div>
           </div>
           <ul class="tree-list" id="tree-root" role="tree"></ul>
           <hr class="sb-divider">
@@ -1691,6 +1694,24 @@ export function buildHtml(
     }
     window.openNewFile  = openNewFile;
     window.closeNewFile = closeNewFile;
+
+    window.syncFiles = async function() {
+      var btn = document.getElementById('sync-btn');
+      if (btn) { btn.style.opacity = '0.4'; btn.style.pointerEvents = 'none'; }
+      try {
+        var res = await fetch('/api/tree');
+        var tree = await res.json();
+        var res2 = await fetch('/api/files');
+        var files = await res2.json();
+        cfg.tree = tree; cfg.files = files;
+        rebuildTree();
+        if (cfg.isDir) loadTags();
+      } catch(e) {
+        if (statusText) statusText.textContent = '새로고침 실패';
+      } finally {
+        if (btn) { btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+      }
+    };
 
     window.createNewFile = async function() {
       if (!nfName) return;

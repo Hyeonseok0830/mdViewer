@@ -42,6 +42,7 @@ interface BusEventMap {
   'file:ready': FileReadyPayload[];
   'file:changed': FileChangedPayload;
   'file:added': { path: string };
+  'file:removed': { path: string };
   'render:done': RenderDonePayload;
   'render:error': RenderErrorPayload;
   'server:ready': ServerReadyPayload;

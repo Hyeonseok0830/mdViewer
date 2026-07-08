@@ -26,8 +26,10 @@ export class WatchAgent {
       });
       this.watcher.on('change', (rel) => this.handleChange(join(this.resolved, rel)));
       this.watcher.on('add', (rel) => {
-        const abs = join(this.resolved, rel);
-        bus.typedEmit('file:added', { path: abs });
+        bus.typedEmit('file:added', { path: join(this.resolved, rel) });
+      });
+      this.watcher.on('unlink', (rel) => {
+        bus.typedEmit('file:removed', { path: join(this.resolved, rel) });
       });
     } else {
       this.watcher = chokidar.watch(this.resolved, {
