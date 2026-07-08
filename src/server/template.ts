@@ -1109,15 +1109,18 @@ export function buildHtml(
       var cur = localStorage.getItem('mdv-theme') || (isDark() ? 'dark' : 'light');
       if (grid && !grid.children.length) {
         grid.innerHTML = THEMES.map(function(th) {
-          return '<button class="tp-card' + (cur === th.id ? ' active' : '') + '" data-tid="' + th.id + '" onclick="applyTheme(\'' + th.id + '\')">'
+          return '<button class="tp-card' + (cur === th.id ? ' active' : '') + '" data-tid="' + th.id + '">'
             + '<div class="tp-swatch" style="background:' + th.bg + '">'
             + '<div style="position:absolute;bottom:4px;left:4px;right:14px;height:5px;border-radius:3px;background:' + th.sb + ';opacity:.85"></div>'
             + '<div style="position:absolute;bottom:4px;right:4px;width:10px;height:10px;border-radius:50%;background:' + th.ac + '"></div>'
-            + '<div class="tp-check" style="color:' + th.ac + '">✓</div>'
+            + '<div class="tp-check" style="color:' + th.ac + '">&#10003;</div>'
             + '</div>'
             + '<div class="tp-name">' + th.label + '</div>'
             + '</button>';
         }).join('');
+        grid.querySelectorAll('.tp-card').forEach(function(btn) {
+          btn.addEventListener('click', function() { window.applyTheme(this.dataset.tid); });
+        });
       } else if (grid) {
         grid.querySelectorAll('.tp-card').forEach(function(c) { c.classList.toggle('active', c.dataset.tid === cur); });
       }
