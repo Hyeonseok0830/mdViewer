@@ -144,9 +144,10 @@ export function buildHtml(
     #search-btn, #graph-btn { background:none;border:none;cursor:pointer;color:var(--hdr-fg);
                                opacity:.5;font-size:14px;padding:4px 6px;border-radius:4px; }
     #search-btn:hover, #graph-btn:hover { opacity:.9;background:var(--border); }
-    #theme-btn { background:none;border:none;cursor:pointer;color:var(--hdr-fg);
-                 opacity:.5;font-size:14px;padding:4px 6px;border-radius:4px; }
-    #theme-btn:hover { opacity:.9;background:var(--border); }
+    #theme-btn { background:none;border:1px solid var(--border);cursor:pointer;color:var(--hdr-fg);
+                 opacity:.85;font-size:13px;padding:3px 9px;border-radius:6px;
+                 display:flex;align-items:center;gap:5px;white-space:nowrap; }
+    #theme-btn:hover { opacity:1;background:var(--border); }
 
     /* ── 메인 영역 ───────────────────────────── */
     #main { display:flex;flex:1;min-height:0; }
@@ -514,7 +515,7 @@ export function buildHtml(
     <button id="save-btn" title="저장 (Ctrl+S)" onclick="saveFile()">저장</button>
     <button id="search-btn" title="전체 검색 (Ctrl+Shift+F)" onclick="openSearch()">🔍</button>
     <button id="graph-btn" title="그래프 뷰" onclick="openGraph()">◉</button>
-    <button id="theme-btn" onclick="openThemePicker(event)">◑</button>
+    <button id="theme-btn" title="테마 선택" onclick="openThemePicker(event)"><span id="theme-btn-icon">◑</span> 테마</button>
   </div>
 
   <div id="main">
@@ -1089,8 +1090,8 @@ export function buildHtml(
       return th ? th.dark : false;
     }
     function syncThemeBtn() {
-      var btn = document.getElementById('theme-btn');
-      if (btn) btn.textContent = isDark() ? '☀' : '☾';
+      var icon = document.getElementById('theme-btn-icon');
+      if (icon) icon.textContent = isDark() ? '☀' : '☾';
     }
     window.applyTheme = function(id) {
       document.documentElement.setAttribute('data-theme', id);

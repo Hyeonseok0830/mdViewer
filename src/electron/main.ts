@@ -283,7 +283,9 @@ if (!gotLock) {
     let inputPath = await getInputPathFromArgs();
 
     if (!inputPath) {
-      const result = await dialog.showOpenDialog({
+      // 로딩 화면이 뜬 뒤 다이얼로그가 그 위에 올라오도록 먼저 표시
+      mainWindow?.show();
+      const result = await dialog.showOpenDialog(mainWindow!, {
         title: '마크다운 파일 또는 폴더 선택',
         properties: ['openFile', 'openDirectory'],
         filters: [{ name: 'Markdown', extensions: ['md', 'markdown'] }, { name: '모든 파일', extensions: ['*'] }],
