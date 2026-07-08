@@ -4,7 +4,7 @@ import fastifyWebSocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
 import { resolve, relative, dirname, basename, sep, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
 import { bus, type TocItem } from '../bus.js';
 import { buildHtml } from '../server/template.js';
 import type { RenderAgent } from './RenderAgent.js';
@@ -296,6 +296,66 @@ export class ServerAgent {
         return { relativePath: rel, absolutePath: abs };
       } catch (err) {
         if ((err as NodeJS.ErrnoException).code === 'EEXIST') return reply.code(409).send({ error: '파일이 이미 존재합니다' });
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 파일 이름 변경 API ─────────────────────────
+    this.app.post('/api/files/rename', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const { path: relPath, newName } = req.body as { path: string; newName: string };
+      if (!relPath || !newName) return reply.code(400).send({ error: '유효하지 않은 요청' });
+      const safeName = newName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
+      if (!safeName) return reply.code(400).send({ error: '유효하지 않은 파일명' });
+      const finalName = safeName.endsWith('.md') ? safeName : safeName + '.md';
+      const absOld = resolve(this.rootDir, relPath);
+      if (!this.isSafePath(absOld)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      const absNew = join(dirname(absOld), finalName);
+      if (!this.isSafePath(absNew)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      const relNew = relative(this.rootDir, absNew).replace(/\\/g, '/');
+      try {
+        await rename(absOld, absNew);
+        const content = this.contentIndex.get(absOld);
+        const renderCache = this.renders.get(absOld);
+        const wc = this.wordCounts.get(absOld);
+        if (content !== undefined) { this.contentIndex.delete(absOld); this.contentIndex.set(absNew, content); }
+        if (renderCache !== undefined) { this.renders.delete(absOld); this.renders.set(absNew, renderCache); }
+        if (wc !== undefined) { this.wordCounts.delete(absOld); this.wordCounts.set(absNew, wc); }
+        const entry = this.fileList.find(f => f.absolutePath === absOld);
+        if (entry) { entry.absolutePath = absNew; entry.relativePath = relNew; entry.name = finalName; }
+        const sources = this.backlinksIndex.get(absOld);
+        if (sources) { this.backlinksIndex.delete(absOld); this.backlinksIndex.set(absNew, sources); }
+        for (const files of this.tagsIndex.values()) {
+          if (files.has(absOld)) { files.delete(absOld); files.add(absNew); }
+        }
+        this.fileList.sort((a, b) => a.name.localeCompare(b.name));
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+        return { relativePath: relNew, absolutePath: absNew };
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'EEXIST') return reply.code(409).send({ error: '파일이 이미 존재합니다' });
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 파일 삭제 API ──────────────────────────────
+    this.app.delete('/api/files', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const relPath = (req.query as Record<string, string>).file;
+      if (!relPath) return reply.code(400).send({ error: 'file 파라미터가 필요합니다' });
+      const abs = resolve(this.rootDir, relPath);
+      if (!this.isSafePath(abs)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      try {
+        await unlink(abs);
+        this.contentIndex.delete(abs);
+        this.renders.delete(abs);
+        this.wordCounts.delete(abs);
+        this.backlinksIndex.delete(abs);
+        for (const srcs of this.backlinksIndex.values()) srcs.delete(abs);
+        for (const files of this.tagsIndex.values()) files.delete(abs);
+        this.fileList = this.fileList.filter(f => f.absolutePath !== abs);
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+        return { ok: true };
+      } catch (err) {
         return reply.code(500).send({ error: (err as Error).message });
       }
     });
