@@ -62,12 +62,62 @@ export function buildHtml(
       --th-bg:#313244; --sb-bg:#181825; --editor-bg:#1e1e2e; --editor-fg:#cdd6f4; --accent:#a78bfa;
       --cn:#89b4fa; --ct:#a6e3a1; --cw:#f9e2af; --ci:#a78bfa; --cc:#f38ba8;
     }
+    html[data-theme="material"] {
+      --bg:#121212; --fg:#e3e3e3; --border:#2a2a2a; --code-bg:#1a1a1a;
+      --link:#4fc3f7; --hdr-bg:#1e1e1e; --hdr-fg:#e3e3e3; --muted:#9e9e9e;
+      --th-bg:#2a2a2a; --sb-bg:#1e1e1e; --editor-bg:#121212; --editor-fg:#e3e3e3; --accent:#4fc3f7;
+      --cn:#4fc3f7; --ct:#80cbc4; --cw:#ffcc80; --ci:#ce93d8; --cc:#ef9a9a;
+    }
+    html[data-theme="solarized"] {
+      --bg:#fdf6e3; --fg:#657b83; --border:#eee8d5; --code-bg:#eee8d5;
+      --link:#268bd2; --hdr-bg:#eee8d5; --hdr-fg:#586e75; --muted:#93a1a1;
+      --th-bg:#eee8d5; --sb-bg:#eee8d5; --editor-bg:#fdf6e3; --editor-fg:#657b83; --accent:#2aa198;
+      --cn:#268bd2; --ct:#859900; --cw:#b58900; --ci:#6c71c4; --cc:#dc322f;
+    }
+    html[data-theme="nord"] {
+      --bg:#2e3440; --fg:#d8dee9; --border:#3b4252; --code-bg:#272c36;
+      --link:#88c0d0; --hdr-bg:#3b4252; --hdr-fg:#eceff4; --muted:#616e88;
+      --th-bg:#3b4252; --sb-bg:#3b4252; --editor-bg:#2e3440; --editor-fg:#d8dee9; --accent:#88c0d0;
+      --cn:#81a1c1; --ct:#a3be8c; --cw:#ebcb8b; --ci:#b48ead; --cc:#bf616a;
+    }
 
     /* ── Shiki 이중 테마 ──────────────────────── */
     .shiki,.shiki span { color:var(--shiki-light);background-color:var(--shiki-light-bg); }
     @media (prefers-color-scheme:dark) { .shiki,.shiki span { color:var(--shiki-dark)!important;background-color:var(--shiki-dark-bg)!important; } }
-    html[data-theme="dark"] .shiki,html[data-theme="dark"] .shiki span { color:var(--shiki-dark)!important;background-color:var(--shiki-dark-bg)!important; }
-    html[data-theme="light"] .shiki,html[data-theme="light"] .shiki span { color:var(--shiki-light)!important;background-color:var(--shiki-light-bg)!important; }
+    html[data-theme="dark"] .shiki,html[data-theme="dark"] .shiki span,
+    html[data-theme="material"] .shiki,html[data-theme="material"] .shiki span,
+    html[data-theme="nord"] .shiki,html[data-theme="nord"] .shiki span { color:var(--shiki-dark)!important;background-color:var(--shiki-dark-bg)!important; }
+    html[data-theme="light"] .shiki,html[data-theme="light"] .shiki span,
+    html[data-theme="solarized"] .shiki,html[data-theme="solarized"] .shiki span { color:var(--shiki-light)!important;background-color:var(--shiki-light-bg)!important; }
+
+    /* ── 테마 피커 ─────────────────────────────── */
+    #theme-panel {
+      display:none;position:fixed;z-index:6000;
+      background:var(--hdr-bg);border:1px solid var(--border);
+      border-radius:12px;padding:16px 14px 12px;
+      box-shadow:0 8px 32px rgba(0,0,0,.28),0 2px 8px rgba(0,0,0,.12);
+      min-width:264px;
+    }
+    #theme-panel.open { display:block;animation:tpIn .15s ease; }
+    @keyframes tpIn { from{opacity:0;transform:translateY(-6px) scale(.97)} to{opacity:1;transform:none} }
+    .tp-hd { font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px; }
+    .tp-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:7px; }
+    .tp-card {
+      background:none;border:2px solid transparent;border-radius:8px;
+      padding:6px 4px 7px;cursor:pointer;transition:border-color .12s,background .12s;
+    }
+    .tp-card:hover { background:color-mix(in srgb,var(--accent) 8%,transparent); }
+    .tp-card.active { border-color:var(--accent); }
+    .tp-swatch {
+      width:100%;aspect-ratio:16/9;border-radius:5px;margin-bottom:5px;
+      position:relative;overflow:hidden;border:1px solid rgba(128,128,128,.18);
+    }
+    .tp-check {
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      font-size:14px;font-weight:700;opacity:0;transition:opacity .1s;
+    }
+    .tp-card.active .tp-check { opacity:1; }
+    .tp-name { font-size:11px;color:var(--fg);text-align:center;line-height:1; }
     .shiki { border:1px solid var(--border);border-radius:6px;padding:16px;overflow-x:auto;margin:16px 0;
              font-family:'SFMono-Regular',Consolas,monospace;font-size:.875em;line-height:1.6; }
 
@@ -464,7 +514,7 @@ export function buildHtml(
     <button id="save-btn" title="저장 (Ctrl+S)" onclick="saveFile()">저장</button>
     <button id="search-btn" title="전체 검색 (Ctrl+Shift+F)" onclick="openSearch()">🔍</button>
     <button id="graph-btn" title="그래프 뷰" onclick="openGraph()">◉</button>
-    <button id="theme-btn" onclick="toggleTheme()">◑</button>
+    <button id="theme-btn" onclick="openThemePicker(event)">◑</button>
   </div>
 
   <div id="main">
@@ -622,6 +672,12 @@ export function buildHtml(
   </div>
 
   <!-- ── Status Bar ── -->
+  <!-- ── 테마 피커 ── -->
+  <div id="theme-panel">
+    <div class="tp-hd">테마 선택</div>
+    <div class="tp-grid" id="tp-grid"></div>
+  </div>
+
   <div id="statusbar">
     <span id="wordcount-badge"></span>
     <div id="status">
@@ -1016,20 +1072,63 @@ export function buildHtml(
     }
 
     /* ── 테마 ────────────────────────── */
+    var THEMES = [
+      { id:'light',     label:'라이트',      bg:'#f5f4f1', sb:'#eae9e5', ac:'#7c3aed', dark:false },
+      { id:'dark',      label:'모카',         bg:'#1e1e2e', sb:'#181825', ac:'#a78bfa', dark:true  },
+      { id:'material',  label:'머테리얼',     bg:'#121212', sb:'#1e1e1e', ac:'#4fc3f7', dark:true  },
+      { id:'solarized', label:'솔라라이즈드', bg:'#fdf6e3', sb:'#eee8d5', ac:'#2aa198', dark:false },
+      { id:'nord',      label:'노드',         bg:'#2e3440', sb:'#3b4252', ac:'#88c0d0', dark:true  },
+    ];
     function isDark() {
       var t = document.documentElement.getAttribute('data-theme');
-      return t === 'dark' || (!t && matchMedia('(prefers-color-scheme:dark)').matches);
+      if (!t) return matchMedia('(prefers-color-scheme:dark)').matches;
+      var th = THEMES.find(function(x){ return x.id === t; });
+      return th ? th.dark : false;
     }
     function syncThemeBtn() {
       var btn = document.getElementById('theme-btn');
       if (btn) btn.textContent = isDark() ? '☀' : '☾';
     }
-    window.toggleTheme = function() {
-      var next = isDark() ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('mdv-theme', next);
+    window.applyTheme = function(id) {
+      document.documentElement.setAttribute('data-theme', id);
+      localStorage.setItem('mdv-theme', id);
       syncThemeBtn();
-      if (window.__mermaidInit) window.__mermaidInit(next === 'dark');
+      if (window.__mermaidInit) window.__mermaidInit(isDark());
+      var panel = document.getElementById('theme-panel');
+      if (panel) panel.classList.remove('open');
+      document.querySelectorAll('.tp-card').forEach(function(c) {
+        c.classList.toggle('active', c.dataset.tid === id);
+      });
+    };
+    window.openThemePicker = function(e) {
+      if (e) e.stopPropagation();
+      var panel = document.getElementById('theme-panel');
+      if (!panel) return;
+      if (panel.classList.contains('open')) { panel.classList.remove('open'); return; }
+      var grid = document.getElementById('tp-grid');
+      var cur = localStorage.getItem('mdv-theme') || (isDark() ? 'dark' : 'light');
+      if (grid && !grid.children.length) {
+        grid.innerHTML = THEMES.map(function(th) {
+          return '<button class="tp-card' + (cur === th.id ? ' active' : '') + '" data-tid="' + th.id + '" onclick="applyTheme(\'' + th.id + '\')">'
+            + '<div class="tp-swatch" style="background:' + th.bg + '">'
+            + '<div style="position:absolute;bottom:4px;left:4px;right:14px;height:5px;border-radius:3px;background:' + th.sb + ';opacity:.85"></div>'
+            + '<div style="position:absolute;bottom:4px;right:4px;width:10px;height:10px;border-radius:50%;background:' + th.ac + '"></div>'
+            + '<div class="tp-check" style="color:' + th.ac + '">✓</div>'
+            + '</div>'
+            + '<div class="tp-name">' + th.label + '</div>'
+            + '</button>';
+        }).join('');
+      } else if (grid) {
+        grid.querySelectorAll('.tp-card').forEach(function(c) { c.classList.toggle('active', c.dataset.tid === cur); });
+      }
+      var btn = document.getElementById('theme-btn');
+      if (btn) {
+        var r = btn.getBoundingClientRect();
+        panel.style.top  = (r.bottom + 6) + 'px';
+        panel.style.right = (window.innerWidth - r.right) + 'px';
+        panel.style.left = '';
+      }
+      panel.classList.add('open');
     };
     syncThemeBtn();
 
@@ -1740,6 +1839,10 @@ export function buildHtml(
 
     document.addEventListener('click', function(e) {
       if (ctxMenu && !ctxMenu.contains(e.target)) ctxMenu.classList.remove('visible');
+      var tp = document.getElementById('theme-panel');
+      var tb = document.getElementById('theme-btn');
+      if (tp && tp.classList.contains('open') && !tp.contains(e.target) && e.target !== tb)
+        tp.classList.remove('open');
     });
 
     var ctxOpenBtn     = document.getElementById('ctx-open');
@@ -1862,8 +1965,8 @@ export function buildHtml(
   <script src="/vendor/mermaid.min.js" onerror="void 0"></script>
   <script>
     (function(){
-      var dark = function(){ return document.documentElement.getAttribute('data-theme')==='dark'
-        ||(!document.documentElement.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches); };
+      var dark = function(){ var t=document.documentElement.getAttribute('data-theme');
+        return t==='dark'||t==='material'||t==='nord'||(!t&&matchMedia('(prefers-color-scheme:dark)').matches); };
       if(typeof mermaid !== 'undefined'){
         window.__mermaidInit=function(d){ mermaid.initialize({startOnLoad:false,theme:d?'dark':'default'}); };
         window.__mermaidRender=async function(){ var n=document.querySelectorAll('.mermaid:not([data-processed])');if(n.length)await mermaid.run({nodes:n}); };
@@ -1887,8 +1990,8 @@ export function buildHtml(
       var W = svgEl.clientWidth || 800;
       var H = svgEl.clientHeight || 600;
 
-      var isDark = document.documentElement.getAttribute('data-theme') === 'dark'
-        || (!document.documentElement.getAttribute('data-theme') && matchMedia('(prefers-color-scheme:dark)').matches);
+      var t0 = document.documentElement.getAttribute('data-theme');
+      var isDark = t0==='dark'||t0==='material'||t0==='nord'||(!t0&&matchMedia('(prefers-color-scheme:dark)').matches);
 
       var deg = {};
       nodes.forEach(function(n) { deg[n.id] = 0; });
