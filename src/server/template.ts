@@ -506,7 +506,7 @@ export function buildHtml(
           <hr class="sb-divider">
         </div>
         <!-- TOC 섹션 -->
-        <div id="toc-section" class="sb-section">
+        <div id="toc-section" class="sb-section" style="display:none">
           <span class="sb-title">목차</span>
           <ul id="toc-list" role="list"></ul>
         </div>
@@ -653,6 +653,7 @@ export function buildHtml(
     var fmEl         = document.getElementById('frontmatter');
     var treeRoot     = document.getElementById('tree-root');
     var treeSection  = document.getElementById('tree-section');
+    var tocSection   = document.getElementById('toc-section');
     var tocList      = document.getElementById('toc-list');
     var editor       = document.getElementById('editor');
     var editorPanel  = document.getElementById('editor-panel');
@@ -967,7 +968,12 @@ export function buildHtml(
 
     /* ── TOC ─────────────────────────── */
     function renderToc(toc) {
-      if (!toc || !toc.length) { tocList.innerHTML = ''; return; }
+      if (!toc || !toc.length) {
+        tocList.innerHTML = '';
+        if (tocSection) tocSection.style.display = 'none';
+        return;
+      }
+      if (tocSection) tocSection.style.display = '';
       tocList.innerHTML = toc.filter(function(i){ return i.depth <= 4; }).map(function(i) {
         return '<li class="h' + i.depth + '"><a href="#' + esc(i.id) + '">' + esc(i.text) + '</a></li>';
       }).join('');
