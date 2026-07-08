@@ -40,15 +40,10 @@ export class RenderAgent {
     process.stdout.write('  하이라이터 준비 완료\n');
 
     bus.typedOn('file:ready', (files) => {
-      if (files.length === 1) {
+      // 단일 파일 모드: 즉시 렌더링
+      // 디렉토리 모드: content가 없으므로 on-demand 렌더링에 맡김
+      if (files.length === 1 && files[0].content) {
         this.render(files[0].path, files[0].content);
-      } else {
-        // 디렉토리 모드: 순차 백그라운드 렌더링으로 그래프/태그/백링크 인덱스 구축
-        (async () => {
-          for (const f of files) {
-            await this.render(f.path, f.content);
-          }
-        })().catch(() => {});
       }
     });
 

@@ -2,6 +2,12 @@ import { readFile, stat, readdir } from 'node:fs/promises';
 import { resolve, extname, join, basename } from 'node:path';
 import { bus, type FileReadyPayload } from '../bus.js';
 
+const IGNORE_DIRS = new Set([
+  '.git', 'node_modules', '.obsidian', '.trash', '.vscode', '.idea',
+  'dist', 'build', 'out', '.next', '.nuxt', '__pycache__', '.cache',
+  '.DS_Store', 'vendor', '.yarn', '.pnp',
+]);
+
 export class FileAgent {
   readonly name = 'FileAgent';
   private readonly resolved: string;
@@ -19,33 +25,52 @@ export class FileAgent {
       process.exit(1);
     }
 
-    const files = s.isDirectory()
-      ? await this.findMdFiles(this.resolved)
-      : [this.resolved];
-
-    if (files.length === 0) {
-      process.stderr.write(`FileAgent: .md 파일이 없습니다 — ${this.resolved}\n`);
-      process.exit(1);
+    if (s.isDirectory()) {
+      const paths = await this.findMdFiles(this.resolved);
+      if (paths.length === 0) {
+        process.stderr.write(`FileAgent: .md 파일이 없습니다 — ${this.resolved}\n`);
+        process.exit(1);
+      }
+      // 파일 목록만 즉시 반환 — 내용은 on-demand 로드
+      bus.typedEmit('file:ready', paths.map((p) => ({ path: p, content: '', mtime: new Date(0) })));
+    } else {
+      // 단일 파일 모드: 내용 즉시 읽어 렌더링
+      const result = await this.load(this.resolved);
+      if (!result) {
+        process.stderr.write('FileAgent: 읽을 수 있는 .md 파일이 없습니다.\n');
+        process.exit(1);
+      }
+      bus.typedEmit('file:ready', [result]);
     }
-
-    const loaded = (await Promise.all(files.map((p) => this.load(p)))).filter(
-      (r): r is FileReadyPayload => r !== null,
-    );
-
-    if (loaded.length === 0) {
-      process.stderr.write('FileAgent: 읽을 수 있는 .md 파일이 없습니다.\n');
-      process.exit(1);
-    }
-
-    bus.typedEmit('file:ready', loaded);
   }
 
   private async findMdFiles(dir: string): Promise<string[]> {
-    const entries = await readdir(dir, { withFileTypes: true, recursive: true });
-    return entries
-      .filter((e) => e.isFile() && extname(e.name).toLowerCase() === '.md')
-      .map((e) => join(e.parentPath, e.name))
-      .sort((a, b) => basename(a).localeCompare(basename(b)));
+    const results: string[] = [];
+    await this.walk(dir, results);
+    results.sort((a, b) => basename(a).localeCompare(basename(b)));
+    return results;
+  }
+
+  private async walk(dir: string, out: string[]): Promise<void> {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    await Promise.all(
+      entries.map((e) => {
+        if (e.isDirectory()) {
+          if (!IGNORE_DIRS.has(e.name) && !e.name.startsWith('.')) {
+            return this.walk(join(dir, e.name), out);
+          }
+          return;
+        }
+        if (e.isFile() && extname(e.name).toLowerCase() === '.md') {
+          out.push(join(e.parentPath ?? dir, e.name));
+        }
+      }),
+    );
   }
 
   async load(filePath: string): Promise<FileReadyPayload | null> {

@@ -74,7 +74,18 @@ export class ServerAgent {
       await this.fileListReady;
       const queryFile = (req.query as Record<string, string>).file;
       const displayPath = this.isDir && !queryFile ? '' : this.resolveDisplayPath(queryFile);
-      const render = displayPath ? this.renders.get(displayPath) : undefined;
+      let render = displayPath ? this.renders.get(displayPath) : undefined;
+
+      // 캐시 미스 → on-demand 렌더링
+      if (!render && displayPath && this.renderAgent) {
+        try {
+          const raw = await readFile(displayPath, 'utf-8');
+          const result = await this.renderAgent.renderRaw(raw);
+          render = { html: result.html, toc: result.toc, frontmatter: result.frontmatter as Record<string, unknown> };
+          this.renders.set(displayPath, render);
+          this.contentIndex.set(displayPath, raw);
+        } catch { /* 빈 페이지 반환 */ }
+      }
 
       reply.header('Content-Type', 'text/html; charset=utf-8');
       return buildHtml(
@@ -202,7 +213,11 @@ export class ServerAgent {
       if (!q || q.length < 2) return { results: [] };
       const results = [];
       for (const f of this.fileList) {
-        const content = this.contentIndex.get(f.absolutePath) ?? '';
+        let content = this.contentIndex.get(f.absolutePath);
+        if (content === undefined) {
+          try { content = await readFile(f.absolutePath, 'utf-8'); this.contentIndex.set(f.absolutePath, content); }
+          catch { continue; }
+        }
         const lc = content.toLowerCase();
         if (!lc.includes(q)) continue;
         const idx = lc.indexOf(q);
@@ -380,11 +395,10 @@ export class ServerAgent {
         relativePath: this.rootDir ? relative(this.rootDir, f.path) : basename(f.path),
         absolutePath: f.path,
       }));
-      for (const f of files) {
-        this.contentIndex.set(f.path, f.content);
-      }
+      // content는 on-demand 로드 — contentIndex는 접근 시점에 채워짐
       this.resolveFileList();
       this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+      this.startBackgroundContentLoad();
     });
 
     bus.typedOn('file:changed', ({ path, content }) => {
@@ -474,9 +488,32 @@ export class ServerAgent {
   private resolveDisplayPath(queryFile?: string): string {
     if (queryFile) {
       const abs = resolve(this.rootDir, queryFile);
-      if (this.renders.has(abs)) return abs;
+      if (this.fileList.find((f) => f.absolutePath === abs)) return abs;
     }
-    return this.renders.keys().next().value ?? '';
+    return this.fileList[0]?.absolutePath ?? '';
+  }
+
+  private startBackgroundContentLoad(): void {
+    const BATCH = 10;
+    const DELAY_MS = 300;
+    const files = [...this.fileList];
+    let i = 0;
+    const tick = async () => {
+      const batch = files.slice(i, i + BATCH);
+      if (batch.length === 0) return;
+      await Promise.all(
+        batch.map(async (f) => {
+          if (this.contentIndex.has(f.absolutePath)) return;
+          try {
+            const raw = await readFile(f.absolutePath, 'utf-8');
+            this.contentIndex.set(f.absolutePath, raw);
+          } catch { /* 읽기 실패 무시 */ }
+        }),
+      );
+      i += BATCH;
+      if (i < files.length) setTimeout(tick, DELAY_MS);
+    };
+    setTimeout(tick, 1000); // 초기 렌더 후 1초 뒤 시작
   }
 
   private buildTree(): TreeNode {
