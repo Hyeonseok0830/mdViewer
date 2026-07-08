@@ -1513,7 +1513,7 @@ export function buildHtml(
           var pos    = editor.selectionStart;
           var before = editor.value.slice(0, pos);
           var last50 = before.slice(-50);
-          var m      = last50.match(/\[\[([^\]]*)$/);
+          var m      = last50.match(/\\[\\[([^\\]]*)$/);
           if (!m) { closeLac(); return; }
           var query  = m[1].toLowerCase();
           var files  = (cfg.files || []).filter(function(f) {
