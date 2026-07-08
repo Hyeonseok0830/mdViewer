@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, Menu, shell, nativeImage, type NativeImage } from 'electron';
 import { stat } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve, dirname, join } from 'node:path';
+import { resolve, dirname, join, relative } from 'node:path';
 import { ICON_PNG_512_B64 } from './icon-data.js';
 import { fileURLToPath } from 'node:url';
 import { bus } from '../bus.js';
@@ -190,18 +190,20 @@ async function startServer(inputPath: string): Promise<void> {
   const s = await stat(inputPath);
   const isDir = s.isDirectory();
   const rootDir = isDir ? inputPath : dirname(inputPath);
+  // 파일을 직접 선택한 경우에도 부모 폴더를 기준으로 탐색 (Obsidian 스타일)
+  const initialFile = !isDir ? relative(rootDir, inputPath).replace(/\\/g, '/') : '';
 
-  const fileAgent = new FileAgent(inputPath);
-  watchAgent = new WatchAgent(inputPath);
+  const fileAgent = new FileAgent(rootDir);
+  watchAgent = new WatchAgent(rootDir);
   const renderAgent = new RenderAgent();
-  serverAgent = new ServerAgent(3000, rootDir, isDir, getKatexPath(), getVendorPath());
+  serverAgent = new ServerAgent(3000, rootDir, true, getKatexPath(), getVendorPath());
   serverAgent.setRenderAgent(renderAgent);
 
   bus.typedOn('server:ready', ({ url }) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.loadURL(url);
-      const label = isDir ? inputPath.split(/[/\\]/).pop() : inputPath.split(/[/\\]/).pop();
-      mainWindow.setTitle(`MdPad — ${label}`);
+      const target = initialFile ? `${url}/?file=${encodeURIComponent(initialFile)}` : url;
+      mainWindow.loadURL(target);
+      mainWindow.setTitle(`MdPad — ${inputPath.split(/[/\\]/).pop()}`);
     }
   });
 

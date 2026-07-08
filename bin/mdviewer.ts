@@ -2,7 +2,7 @@
 import { parseArgs } from 'node:util';
 import { exec } from 'node:child_process';
 import { stat } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { resolve, dirname, relative } from 'node:path';
 import { bus } from '../src/bus.js';
 import { FileAgent } from '../src/agents/FileAgent.js';
 import { WatchAgent } from '../src/agents/WatchAgent.js';
@@ -45,16 +45,19 @@ async function main(): Promise<void> {
   }
 
   const rootDir = isDir ? resolvedPath : dirname(resolvedPath);
+  // 파일을 직접 선택한 경우에도 부모 폴더를 기준으로 탐색 (Obsidian 스타일)
+  const initialFile = !isDir ? relative(rootDir, resolvedPath).replace(/\\/g, '/') : '';
 
-  const fileAgent   = new FileAgent(resolvedPath);
-  const watchAgent  = new WatchAgent(resolvedPath);
+  const fileAgent   = new FileAgent(rootDir);
+  const watchAgent  = new WatchAgent(rootDir);
   const renderAgent = new RenderAgent();
-  const serverAgent = new ServerAgent(port, rootDir, isDir);
+  const serverAgent = new ServerAgent(port, rootDir, true);
   serverAgent.setRenderAgent(renderAgent);
 
   bus.typedOn('server:ready', ({ url }) => {
-    process.stdout.write(`\n  mdViewer 실행 중 → ${url}\n\n`);
-    if (!values['no-open']) openBrowser(url);
+    const target = initialFile ? `${url}/?file=${encodeURIComponent(initialFile)}` : url;
+    process.stdout.write(`\n  mdViewer 실행 중 → ${target}\n\n`);
+    if (!values['no-open']) openBrowser(target);
   });
 
   await renderAgent.start();
