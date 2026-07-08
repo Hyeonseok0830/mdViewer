@@ -164,8 +164,10 @@ export function buildHtml(
     .sb-title-row { display:flex;align-items:center;padding:8px 12px 4px; }
     .sb-title-row .sb-title { padding:0;flex:1; }
     .sb-clear-btn { background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px; }
+    #sync-btn,
     #newfile-btn { background:none;border:none;cursor:pointer;color:var(--muted);
                    font-size:16px;line-height:1;padding:0 2px;font-weight:300; }
+    #sync-btn:hover,
     #newfile-btn:hover { color:var(--fg); }
 
     /* 폴더 트리 */
