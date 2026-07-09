@@ -6,6 +6,7 @@
 
 **EN**
 - Consolidates the Obsidian-style UI overhaul (v2.0.9) into a clean major release
+- **Fixed `Esc` closing the app window** — Electron now intercepts `Esc` and only the topmost overlay (graph view, search, quick switcher, theme picker, rename, autocomplete) is closed
 - **macOS DMG now built for both Intel (x64) and Apple Silicon (arm64)** — previously arm64 only
 - **Release pages now include proper bilingual release notes** (auto-attached by CI from `.github/RELEASE_NOTES.md`)
 - Unified in-app branding to **MdPad** (window title previously showed "mdViewer")
@@ -13,6 +14,7 @@
 
 **KO**
 - 옵시디언 스타일 UI 개편(v2.0.9)을 정리한 메이저 릴리즈
+- **`Esc` 키가 앱 창을 닫던 버그 수정** — Electron이 `Esc`를 가로채 최상위 오버레이(그래프 뷰·검색·퀵 스위처·테마 피커·이름변경·자동완성)만 닫도록 변경
 - **macOS DMG를 인텔(x64)·애플 실리콘(arm64) 둘 다 빌드** — 기존엔 arm64만 제공
 - **릴리즈 페이지에 영/한 릴리즈 노트 자동 첨부** (CI가 `.github/RELEASE_NOTES.md`를 본문으로 사용)
 - 앱 내 표기를 **MdPad**로 통일 (창 제목이 "mdViewer"로 표시되던 문제)

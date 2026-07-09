@@ -23,6 +23,7 @@ Obsidian-inspired major release — a full UI overhaul on top of the existing ag
 
 ## 🔧 Fixes / 수정
 
+- Pressing `Esc` no longer closes the app window — it now only closes the topmost overlay (graph view, search, quick switcher, etc.) / `Esc` 키가 앱 창을 닫던 문제 수정 — 이제 최상위 오버레이(그래프 뷰·검색·퀵 스위처 등)만 닫습니다
 - macOS DMG now ships for both Intel (x64) and Apple Silicon (arm64) / 맥 DMG가 인텔·애플 실리콘 둘 다 제공됩니다
 - Unified in-app branding to **MdPad** / 앱 내 표기를 MdPad로 통일
 - Release pages now include proper release notes / 릴리즈 페이지에 릴리즈 노트 자동 첨부

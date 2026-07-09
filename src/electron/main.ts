@@ -80,6 +80,18 @@ function createWindow(): BrowserWindow {
     shell.openExternal(url);
     return { action: 'deny' };
   });
+
+  // ESC가 창/앱을 닫는 어떤 기본 동작도 차단하고,
+  // 페이지의 오버레이 닫기(__handleEsc)만 명시적으로 실행
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') {
+      event.preventDefault();
+      win.webContents
+        .executeJavaScript('window.__handleEsc && window.__handleEsc()')
+        .catch(() => { /* 페이지 로드 전이면 무시 */ });
+    }
+  });
+
   return win;
 }
 

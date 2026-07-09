@@ -851,6 +851,24 @@ export function buildHtml(
     }
     window.setMode = setMode;
 
+    /* ── ESC 처리 (Electron main도 이 함수를 호출) ──
+       최상위 UI 하나만 닫고 true 반환. 닫을 것이 없으면 false (아무 일도 안 함) */
+    window.__handleEsc = function() {
+      var lac = document.getElementById('link-autocomplete');
+      if (lac && lac.classList.contains('visible')) { lac.classList.remove('visible'); return true; }
+      var ae = document.activeElement;
+      if (ae && ae.tagName === 'INPUT' && ae.closest && ae.closest('.tree-list')) { ae.blur(); return true; }
+      var tp = document.getElementById('theme-panel');
+      if (tp && tp.classList.contains('open')) { tp.classList.remove('open'); return true; }
+      if (grOverlay && grOverlay.classList.contains('open')) { closeGraph(); return true; }
+      if (srOverlay && srOverlay.classList.contains('open')) { closeSearch(); return true; }
+      if (qsSwitcher && qsSwitcher.classList.contains('open')) { closeQuickSwitcher(); return true; }
+      if (nfModal && nfModal.classList.contains('open')) { closeNewFile(); return true; }
+      var ctx = document.getElementById('ctx-menu');
+      if (ctx && ctx.classList.contains('visible')) { ctx.classList.remove('visible'); return true; }
+      return false;
+    };
+
     /* ── 키보드 ──────────────────────── */
     document.addEventListener('keydown', function(e) {
       // Ctrl+S 저장
@@ -860,12 +878,11 @@ export function buildHtml(
       // Ctrl+Shift+F 전체 검색
       if ((e.ctrlKey||e.metaKey) && e.shiftKey && (e.key==='F'||e.key==='f')) { e.preventDefault(); openSearch(); return; }
 
-      // ESC — 최상위 오버레이만 닫기
+      // ESC — 최상위 오버레이만 닫기 (기본 동작 차단: 창/앱이 닫히지 않도록)
       if (e.key==='Escape') {
-        if (grOverlay && grOverlay.classList.contains('open')) { closeGraph(); return; }
-        if (srOverlay && srOverlay.classList.contains('open')) { closeSearch(); return; }
-        if (qsSwitcher && qsSwitcher.classList.contains('open')) { closeQuickSwitcher(); return; }
-        if (nfModal && nfModal.classList.contains('open')) { closeNewFile(); return; }
+        e.preventDefault();
+        e.stopPropagation();
+        window.__handleEsc();
         return;
       }
 
