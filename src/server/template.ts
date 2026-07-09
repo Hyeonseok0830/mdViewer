@@ -1065,7 +1065,7 @@ export function buildHtml(
         setActiveFile(abs);
         currentRel = rel;
         var name = d.name || rel.split('/').pop();
-        document.title = name.replace(/\\.md$/i,'') + '  — mdViewer';
+        document.title = name.replace(/\\.md$/i,'') + ' — MdPad';
         syncInlineTitle(name);
         if (filepathName) filepathName.textContent = name.replace(/\\.md$/i,'');
         if (filepath)  filepath.style.display = '';
@@ -2090,7 +2090,7 @@ export function buildHtml(
             if (filepathName) filepathName.textContent = '';
             if (filepath) filepath.style.display = 'none';
             if (headerSep) headerSep.style.display = 'none';
-            document.title = 'mdViewer';
+            document.title = 'MdPad';
           }
           var recents = getRecents().filter(function(r) { return r.relativePath !== t.rel; });
           localStorage.setItem('mdv-recents', JSON.stringify(recents));

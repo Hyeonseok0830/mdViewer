@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.0.0
+
+### 🚀 Major Release / 메이저 릴리즈
+
+**EN**
+- Consolidates the Obsidian-style UI overhaul (v2.0.9) into a clean major release
+- **macOS DMG now built for both Intel (x64) and Apple Silicon (arm64)** — previously arm64 only
+- **Release pages now include proper bilingual release notes** (auto-attached by CI from `.github/RELEASE_NOTES.md`)
+- Unified in-app branding to **MdPad** (window title previously showed "mdViewer")
+- README fully rewritten: download table, current feature list (wiki links, backlinks, graph view, callouts, quick switcher, full-text search, 6 themes)
+
+**KO**
+- 옵시디언 스타일 UI 개편(v2.0.9)을 정리한 메이저 릴리즈
+- **macOS DMG를 인텔(x64)·애플 실리콘(arm64) 둘 다 빌드** — 기존엔 arm64만 제공
+- **릴리즈 페이지에 영/한 릴리즈 노트 자동 첨부** (CI가 `.github/RELEASE_NOTES.md`를 본문으로 사용)
+- 앱 내 표기를 **MdPad**로 통일 (창 제목이 "mdViewer"로 표시되던 문제)
+- README 전면 개편: 다운로드 표, 최신 기능 목록(위키링크·백링크·그래프 뷰·콜아웃·퀵 스위처·전체 검색·6개 테마) 반영
+
+---
+
 ## v2.0.9
 
 ### ✨ Obsidian-style UI Overhaul / 옵시디언 스타일 UI 개편

@@ -68,6 +68,7 @@ jobs:
             release/*.appx
             release/*.msix
           overwrite: true
+          body_path: .github/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -88,8 +89,8 @@ jobs:
       - name: TypeScript 컴파일
         run: npm run build
 
-      - name: DMG 빌드
-        run: npx electron-builder --mac dmg -p never
+      - name: DMG 빌드 (x64 + arm64)
+        run: npx electron-builder --mac dmg --x64 --arm64 -p never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
@@ -110,6 +111,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           files: release/*.dmg
           overwrite: true
+          body_path: .github/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -157,5 +159,6 @@ jobs:
             release/*.AppImage
             release/*.deb
           overwrite: true
+          body_path: .github/RELEASE_NOTES.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

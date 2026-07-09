@@ -1,6 +1,6 @@
 {
   "name": "mdpad",
-  "version": "2.0.9",
+  "version": "3.0.0",
   "description": "로컬 마크다운 파일 실시간 뷰어/편집기",
   "author": {
     "name": "Hyeonseok",
