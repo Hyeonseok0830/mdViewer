@@ -2,9 +2,9 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fastifyWebSocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
-import { resolve, relative, dirname, basename, sep, join } from 'node:path';
+import { resolve, relative, dirname, basename, sep, join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFile, writeFile, rename, unlink, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink, mkdir, rm } from 'node:fs/promises';
 import { bus, type TocItem } from '../bus.js';
 import { buildHtml } from '../server/template.js';
 import type { RenderAgent } from './RenderAgent.js';
@@ -29,7 +29,9 @@ interface TreeNode {
 
 export class ServerAgent {
   readonly name = 'ServerAgent';
-  private app = Fastify({ logger: false });
+  // bodyLimit: 이미지 붙여넣기(base64) 업로드를 위해 25MB로 상향
+  private app = Fastify({ logger: false, bodyLimit: 25 * 1024 * 1024 });
+  private extraDirs = new Set<string>(); // 빈 폴더도 트리에 표시하기 위한 명시적 생성 폴더 목록
   private clients = new Set<WebSocket>();
   private renders = new Map<string, RenderCache>();
   private fileList: { name: string; relativePath: string; absolutePath: string }[] = [];
@@ -334,25 +336,142 @@ export class ServerAgent {
       if (!this.isSafePath(absNew)) return reply.code(403).send({ error: '허용되지 않는 경로' });
       const relNew = relative(this.rootDir, absNew).replace(/\\/g, '/');
       try {
+        const oldName = basename(absOld);
         await rename(absOld, absNew);
-        const content = this.contentIndex.get(absOld);
-        const renderCache = this.renders.get(absOld);
-        const wc = this.wordCounts.get(absOld);
-        if (content !== undefined) { this.contentIndex.delete(absOld); this.contentIndex.set(absNew, content); }
-        if (renderCache !== undefined) { this.renders.delete(absOld); this.renders.set(absNew, renderCache); }
-        if (wc !== undefined) { this.wordCounts.delete(absOld); this.wordCounts.set(absNew, wc); }
-        const entry = this.fileList.find(f => f.absolutePath === absOld);
-        if (entry) { entry.absolutePath = absNew; entry.relativePath = relNew; entry.name = finalName; }
-        const sources = this.backlinksIndex.get(absOld);
-        if (sources) { this.backlinksIndex.delete(absOld); this.backlinksIndex.set(absNew, sources); }
-        for (const files of this.tagsIndex.values()) {
-          if (files.has(absOld)) { files.delete(absOld); files.add(absNew); }
+        this.remapFile(absOld, absNew, relNew);
+        // 다른 노트의 [[위키링크]]를 새 이름으로 일괄 재작성 (Obsidian Note composer)
+        let updatedLinks = 0;
+        if (oldName.toLowerCase() !== finalName.toLowerCase()) {
+          updatedLinks = await this.rewriteWikiLinks(relPath, oldName, finalName);
         }
-        this.fileList.sort((a, b) => a.name.localeCompare(b.name));
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+        return { relativePath: relNew, absolutePath: absNew, updatedLinks };
+      } catch (err) {
+        if ((err as NodeJS.ErrnoException).code === 'EEXIST') return reply.code(409).send({ error: '파일이 이미 존재합니다' });
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 파일 이동 API (드래그&드롭) ─────────────────
+    this.app.post('/api/files/move', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const { path: relPath, dir = '' } = req.body as { path: string; dir?: string };
+      if (!relPath) return reply.code(400).send({ error: '유효하지 않은 요청' });
+      const absOld = resolve(this.rootDir, relPath);
+      if (!this.isSafePath(absOld)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      const absDir = dir ? resolve(this.rootDir, dir) : this.rootDir;
+      const absNew = join(absDir, basename(absOld));
+      if (!this.isSafePath(absNew)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      if (absNew === absOld) return { relativePath: relPath, absolutePath: absOld };
+      if (this.fileList.find(f => f.absolutePath === absNew)) {
+        return reply.code(409).send({ error: '대상 폴더에 같은 이름의 파일이 이미 있습니다' });
+      }
+      const relNew = relative(this.rootDir, absNew).replace(/\\/g, '/');
+      try {
+        await mkdir(absDir, { recursive: true });
+        await rename(absOld, absNew);
+        this.remapFile(absOld, absNew, relNew);
         this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
         return { relativePath: relNew, absolutePath: absNew };
       } catch (err) {
-        if ((err as NodeJS.ErrnoException).code === 'EEXIST') return reply.code(409).send({ error: '파일이 이미 존재합니다' });
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 폴더 생성 API ──────────────────────────────
+    this.app.post('/api/dirs/new', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const { path: relPath } = req.body as { path: string };
+      const segs = (relPath || '').replace(/\\/g, '/').split('/')
+        .map((s) => s.replace(/[<>:"|?*\x00-\x1f]/g, '').trim())
+        .filter((s) => s && s !== '.' && s !== '..');
+      if (!segs.length) return reply.code(400).send({ error: '유효하지 않은 폴더명' });
+      const abs = resolve(this.rootDir, ...segs);
+      if (!this.isSafePath(abs)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      try {
+        await mkdir(abs, { recursive: true });
+        this.extraDirs.add(segs.join('/'));
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+        return { path: segs.join('/') };
+      } catch (err) {
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 폴더 이름 변경 API ─────────────────────────
+    this.app.post('/api/dirs/rename', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const { path: relPath, newName } = req.body as { path: string; newName: string };
+      if (!relPath || !newName) return reply.code(400).send({ error: '유효하지 않은 요청' });
+      const safeName = newName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
+      if (!safeName) return reply.code(400).send({ error: '유효하지 않은 폴더명' });
+      const absOld = resolve(this.rootDir, relPath);
+      if (!this.isSafePath(absOld) || absOld === this.rootDir) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      const absNew = join(dirname(absOld), safeName);
+      if (!this.isSafePath(absNew)) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      try {
+        await rename(absOld, absNew);
+        this.remapDir(absOld, absNew);
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+        return { path: relative(this.rootDir, absNew).replace(/\\/g, '/') };
+      } catch (err) {
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 폴더 삭제 API (하위 파일 포함) ─────────────
+    this.app.delete('/api/dirs', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const relPath = (req.query as Record<string, string>).dir;
+      if (!relPath) return reply.code(400).send({ error: 'dir 파라미터가 필요합니다' });
+      const abs = resolve(this.rootDir, relPath);
+      if (!this.isSafePath(abs) || abs === this.rootDir) return reply.code(403).send({ error: '허용되지 않는 경로' });
+      try {
+        await rm(abs, { recursive: true, force: true });
+        const prefix = abs + sep;
+        this.fileList = this.fileList.filter(f => !f.absolutePath.startsWith(prefix));
+        for (const m of [this.contentIndex, this.renders, this.wordCounts]) {
+          for (const k of [...m.keys()]) if (k.startsWith(prefix)) m.delete(k);
+        }
+        for (const k of [...this.backlinksIndex.keys()]) if (k.startsWith(prefix)) this.backlinksIndex.delete(k);
+        for (const srcs of this.backlinksIndex.values()) for (const s of [...srcs]) if (s.startsWith(prefix)) srcs.delete(s);
+        for (const files of this.tagsIndex.values()) for (const s of [...files]) if (s.startsWith(prefix)) files.delete(s);
+        const relDir = relative(this.rootDir, abs).replace(/\\/g, '/');
+        for (const d of [...this.extraDirs]) if (d === relDir || d.startsWith(relDir + '/')) this.extraDirs.delete(d);
+        this.broadcast({ type: 'tree:update', tree: this.buildTree(), files: this.fileList });
+        return { ok: true };
+      } catch (err) {
+        return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 이미지 첨부 API (클립보드 붙여넣기) ────────
+    this.app.post('/api/attach', async (req, reply) => {
+      if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
+      const { ext = 'png', data } = req.body as { ext?: string; data: string };
+      if (!data) return reply.code(400).send({ error: '데이터가 필요합니다' });
+      const safeExt = ext.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'png';
+      const dirAbs = join(this.rootDir, 'attachments');
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+      try {
+        await mkdir(dirAbs, { recursive: true });
+        this.extraDirs.add('attachments');
+        const buf = Buffer.from(data, 'base64');
+        let name = '';
+        for (let n = 0; ; n++) {
+          name = n === 0 ? `paste-${stamp}.${safeExt}` : `paste-${stamp}-${n}.${safeExt}`;
+          try {
+            await writeFile(join(dirAbs, name), buf, { flag: 'wx' });
+            break;
+          } catch (err) {
+            if ((err as NodeJS.ErrnoException).code === 'EEXIST' && n < 100) continue;
+            throw err;
+          }
+        }
+        return { relativePath: 'attachments/' + name };
+      } catch (err) {
         return reply.code(500).send({ error: (err as Error).message });
       }
     });
@@ -377,6 +496,28 @@ export class ServerAgent {
         return { ok: true };
       } catch (err) {
         return reply.code(500).send({ error: (err as Error).message });
+      }
+    });
+
+    // ── 볼트 내 첨부파일(이미지 등) 정적 서빙 ─────────
+    const ASSET_TYPES: Record<string, string> = {
+      '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+      '.svg': 'image/svg+xml', '.webp': 'image/webp', '.bmp': 'image/bmp', '.ico': 'image/x-icon',
+      '.pdf': 'application/pdf', '.mp4': 'video/mp4', '.webm': 'video/webm',
+      '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
+    };
+    this.app.get('/*', async (req, reply) => {
+      const urlPath = decodeURIComponent((req.raw.url ?? '').split('?')[0]);
+      const type = ASSET_TYPES[extname(urlPath).toLowerCase()];
+      if (!type || !this.rootDir) return reply.code(404).send({ error: 'not found' });
+      const abs = resolve(this.rootDir, '.' + urlPath);
+      if (!this.isSafePath(abs)) return reply.code(403).send({ error: 'forbidden' });
+      try {
+        const buf = await readFile(abs);
+        reply.header('Content-Type', type);
+        return reply.send(buf);
+      } catch {
+        return reply.code(404).send({ error: 'not found' });
       }
     });
 
@@ -475,6 +616,91 @@ export class ServerAgent {
     await this.tryListen();
   }
 
+  /** 파일 이동/이름변경 시 모든 인덱스의 경로 갱신 */
+  private remapFile(absOld: string, absNew: string, relNew: string): void {
+    const content = this.contentIndex.get(absOld);
+    const renderCache = this.renders.get(absOld);
+    const wc = this.wordCounts.get(absOld);
+    if (content !== undefined) { this.contentIndex.delete(absOld); this.contentIndex.set(absNew, content); }
+    if (renderCache !== undefined) { this.renders.delete(absOld); this.renders.set(absNew, renderCache); }
+    if (wc !== undefined) { this.wordCounts.delete(absOld); this.wordCounts.set(absNew, wc); }
+    const entry = this.fileList.find(f => f.absolutePath === absOld);
+    if (entry) { entry.absolutePath = absNew; entry.relativePath = relNew; entry.name = basename(absNew); }
+    const sources = this.backlinksIndex.get(absOld);
+    if (sources) { this.backlinksIndex.delete(absOld); this.backlinksIndex.set(absNew, sources); }
+    for (const srcs of this.backlinksIndex.values()) {
+      if (srcs.has(absOld)) { srcs.delete(absOld); srcs.add(absNew); }
+    }
+    for (const files of this.tagsIndex.values()) {
+      if (files.has(absOld)) { files.delete(absOld); files.add(absNew); }
+    }
+    this.fileList.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** 폴더 이름변경 시 하위 전체 경로를 인덱스에서 일괄 치환 */
+  private remapDir(absOld: string, absNew: string): void {
+    const prefix = absOld + sep;
+    const mapKey = (k: string) => absNew + k.slice(absOld.length);
+    for (const f of this.fileList) {
+      if (f.absolutePath.startsWith(prefix)) {
+        f.absolutePath = mapKey(f.absolutePath);
+        f.relativePath = relative(this.rootDir, f.absolutePath).replace(/\\/g, '/');
+      }
+    }
+    const remap = <V>(m: Map<string, V>) => {
+      for (const k of [...m.keys()]) {
+        if (k.startsWith(prefix)) { const v = m.get(k) as V; m.delete(k); m.set(mapKey(k), v); }
+      }
+    };
+    remap(this.contentIndex); remap(this.renders); remap(this.wordCounts);
+    for (const k of [...this.backlinksIndex.keys()]) {
+      if (k.startsWith(prefix)) { const v = this.backlinksIndex.get(k)!; this.backlinksIndex.delete(k); this.backlinksIndex.set(mapKey(k), v); }
+    }
+    for (const srcs of this.backlinksIndex.values()) {
+      for (const s of [...srcs]) if (s.startsWith(prefix)) { srcs.delete(s); srcs.add(mapKey(s)); }
+    }
+    for (const files of this.tagsIndex.values()) {
+      for (const s of [...files]) if (s.startsWith(prefix)) { files.delete(s); files.add(mapKey(s)); }
+    }
+    const relOld = relative(this.rootDir, absOld).replace(/\\/g, '/');
+    const relNew = relative(this.rootDir, absNew).replace(/\\/g, '/');
+    for (const d of [...this.extraDirs]) {
+      if (d === relOld || d.startsWith(relOld + '/')) {
+        this.extraDirs.delete(d);
+        this.extraDirs.add(relNew + d.slice(relOld.length));
+      }
+    }
+  }
+
+  /** 노트 이름 변경 시 다른 노트의 [[위키링크]] 대상을 새 이름으로 재작성 */
+  private async rewriteWikiLinks(oldRel: string, oldName: string, newName: string): Promise<number> {
+    const oldBase = oldName.replace(/\.md$/i, '').toLowerCase();
+    const oldPath = oldRel.replace(/\\/g, '/').replace(/\.md$/i, '').toLowerCase();
+    const newBase = newName.replace(/\.md$/i, '');
+    const re = /(!?\[\[)([^\]|#]+)((?:[#|][^\]]*)?\]\])/g;
+    let updated = 0;
+    for (const f of this.fileList) {
+      let content = this.contentIndex.get(f.absolutePath);
+      if (content === undefined) {
+        try { content = await readFile(f.absolutePath, 'utf-8'); } catch { continue; }
+      }
+      if (!content.includes('[[')) continue;
+      let changed = false;
+      const next = content.replace(re, (m, pre: string, target: string, post: string) => {
+        const t = target.trim().replace(/\.md$/i, '').toLowerCase();
+        if (t === oldBase || t === oldPath) { changed = true; return pre + newBase + post; }
+        return m;
+      });
+      if (changed) {
+        await writeFile(f.absolutePath, next, 'utf-8');
+        this.contentIndex.set(f.absolutePath, next);
+        this.renders.delete(f.absolutePath); // 캐시 무효화 → 다음 조회 시 재렌더
+        updated++;
+      }
+    }
+    return updated;
+  }
+
   private findFileByName(name: string): string | null {
     const nameWithExt = name.toLowerCase().endsWith('.md') ? name.toLowerCase() : name.toLowerCase() + '.md';
     const entry = this.fileList.find(f =>
@@ -523,6 +749,20 @@ export class ServerAgent {
 
   private buildTree(): TreeNode {
     const root: TreeNode = { name: '', path: '', absPath: this.rootDir, type: 'dir', children: [] };
+
+    // 명시적으로 생성된 빈 폴더도 트리에 표시
+    for (const d of this.extraDirs) {
+      const parts = d.split('/');
+      let node = root;
+      for (let i = 0; i < parts.length; i++) {
+        let dir = node.children.find((c) => c.type === 'dir' && c.name === parts[i]);
+        if (!dir) {
+          dir = { name: parts[i], path: parts.slice(0, i + 1).join('/'), absPath: join(this.rootDir, ...parts.slice(0, i + 1)), type: 'dir', children: [] };
+          node.children.push(dir);
+        }
+        node = dir;
+      }
+    }
 
     for (const f of this.fileList) {
       const rel = f.relativePath.replace(/\\/g, '/');

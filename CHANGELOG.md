@@ -1,5 +1,29 @@
 # Changelog
 
+## v3.2.0
+
+### 🗂 Vault Management / 볼트 관리
+
+**EN**
+- **Link-safe renames** — renaming a note rewrites every `[[wiki link]]` (aliases and `![[embeds]]` included) across the vault
+- **File management**: drag & drop notes between folders; create/rename/delete folders via folder context menu
+- **Outgoing links panel** in the sidebar (unresolved targets shown, click to create)
+- **Templates** — `templates/` folder + command-palette insert with `{{date}}` `{{time}}` `{{title}}`
+- **Slash commands** — type `/` in the editor for headings, checkboxes, tables, callouts, code blocks and more
+- **Image paste** — clipboard images saved to `attachments/` and auto-linked; vault images now served in preview
+- Empty folders appear in the file explorer
+
+**KO**
+- **링크가 깨지지 않는 이름 변경** — 노트 이름 변경 시 볼트 전체의 `[[위키링크]]`(별칭·`![[임베드]]` 포함) 자동 재작성
+- **파일 관리**: 드래그&드롭 폴더 간 이동, 폴더 우클릭 메뉴로 생성/이름변경/삭제
+- **아웃고잉 링크 패널** — 사이드바에 참조 노트 표시 (미생성 노트 포함, 클릭 시 생성)
+- **템플릿** — `templates/` 폴더 + 명령 팔레트 삽입, `{{date}}` `{{time}}` `{{title}}` 변수
+- **슬래시 명령** — 에디터에서 `/` 입력으로 제목·체크박스·표·콜아웃·코드 블록 등 삽입
+- **이미지 붙여넣기** — 클립보드 이미지를 `attachments/`에 저장 후 자동 링크, 볼트 내 이미지 미리보기 서빙
+- 빈 폴더도 파일 탐색기에 표시
+
+---
+
 ## v3.1.0
 
 ### ⚡ Obsidian-grade Features / 옵시디언 핵심 기능

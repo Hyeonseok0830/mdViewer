@@ -188,10 +188,10 @@ export function buildHtml(
     .sb-title-row { display:flex;align-items:center;padding:8px 12px 4px; }
     .sb-title-row .sb-title { padding:0;flex:1; }
     .sb-clear-btn { background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px; }
-    #sync-btn,
+    #sync-btn, #newfolder-btn,
     #newfile-btn { background:none;border:none;cursor:pointer;color:var(--muted);
                    font-size:16px;line-height:1;padding:0 2px;font-weight:300; }
-    #sync-btn:hover,
+    #sync-btn:hover, #newfolder-btn:hover,
     #newfile-btn:hover { color:var(--fg); }
 
     /* 폴더 트리 */
@@ -202,6 +202,8 @@ export function buildHtml(
                       cursor:pointer;color:var(--muted);font-size:13px;user-select:none;
                       font-weight:500;transition:background .1s,color .1s; }
     .tree-dir-label:hover { background:color-mix(in srgb,var(--fg) 7%,transparent);color:var(--fg); }
+    .tree-dir-label.drop-hover, .sb-title-row.drop-hover {
+      background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--fg); }
     .tree-arrow { font-size:9px;transition:transform .15s;display:inline-block;width:12px;opacity:.6; }
     .tree-arrow.open { transform:rotate(90deg); }
     .tree-children { display:none;position:relative; }
@@ -241,11 +243,12 @@ export function buildHtml(
     .tag-pill:hover, .tag-pill.active { background:var(--accent);color:#fff;border-color:var(--accent); }
     .tag-pill .tag-count { opacity:.7;margin-left:2px; }
 
-    /* Backlinks */
-    #backlinks-list li a { display:block;padding:3px 8px 3px 12px;color:var(--muted);
-                            text-decoration:none;font-size:12px;
-                            white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-    #backlinks-list li a:hover { color:var(--fg);background:var(--code-bg); }
+    /* Backlinks · Outgoing links */
+    #backlinks-list li a, #outlinks-list li a {
+      display:block;padding:3px 8px 3px 12px;color:var(--muted);
+      text-decoration:none;font-size:12px;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    #backlinks-list li a:hover, #outlinks-list li a:hover { color:var(--fg);background:var(--code-bg); }
 
     /* ── 에디터 패널 ──────────────────────────── */
     #editor-panel { display:none;flex-direction:column;flex:1;min-width:0;
@@ -476,14 +479,15 @@ export function buildHtml(
     #wiki-preview-popup .wp-body h2,
     #wiki-preview-popup .wp-body h3 { font-size:12px; margin:0 0 4px; color:var(--fg); }
 
-    /* ── Link Autocomplete ───────────────────── */
-    #link-autocomplete {
+    /* ── Link Autocomplete · 슬래시 메뉴 ─────── */
+    #link-autocomplete, #slash-menu {
       display:none; position:fixed; z-index:3000;
       background:var(--bg); border:1px solid var(--border); border-radius:6px;
       box-shadow:0 8px 24px rgba(0,0,0,.18); overflow:hidden;
       min-width:220px; max-width:340px;
     }
-    #link-autocomplete.visible { display:block; }
+    #slash-menu { max-height:280px; overflow-y:auto; }
+    #link-autocomplete.visible, #slash-menu.visible { display:block; }
     .lac-item {
       padding:7px 12px; cursor:pointer; font-size:13px;
       color:var(--fg); border-left:3px solid transparent;
@@ -535,12 +539,12 @@ export function buildHtml(
     .dot.off { background:#f38ba8; }
 
     /* ── 컨텍스트 메뉴 ────────────────────────── */
-    #ctx-menu {
+    #ctx-menu, #ctx-dir-menu {
       display:none;position:fixed;z-index:4000;
       background:var(--bg);border:1px solid var(--border);border-radius:7px;
       box-shadow:0 6px 20px rgba(0,0,0,.18);overflow:hidden;min-width:150px;
     }
-    #ctx-menu.visible { display:block; }
+    #ctx-menu.visible, #ctx-dir-menu.visible { display:block; }
     .ctx-item {
       padding:7px 14px;cursor:pointer;font-size:13px;color:var(--fg);
       transition:background .1s;user-select:none;
@@ -603,6 +607,7 @@ export function buildHtml(
             <span class="sb-title">파일</span>
             <div style="display:flex;gap:4px;align-items:center">
               <button id="sync-btn" title="폴더 새로고침" onclick="syncFiles()">⟳</button>
+              <button id="newfolder-btn" title="새 폴더" onclick="newFolderPrompt('')">⊞</button>
               <button id="newfile-btn" title="새 파일" onclick="openNewFile()">+</button>
             </div>
           </div>
@@ -628,6 +633,12 @@ export function buildHtml(
           <hr class="sb-divider">
           <span class="sb-title">이 노트를 참조하는 파일</span>
           <ul class="tree-list" id="backlinks-list"></ul>
+        </div>
+        <!-- 아웃고잉 링크 섹션 -->
+        <div id="outlinks-section" class="sb-section" style="display:none">
+          <hr class="sb-divider">
+          <span class="sb-title">이 노트가 참조하는 파일</span>
+          <ul class="tree-list" id="outlinks-list"></ul>
         </div>
       </div>
     </nav>
@@ -754,6 +765,19 @@ export function buildHtml(
     <div class="ctx-item ctx-danger" id="ctx-delete">삭제</div>
   </div>
 
+  <!-- ── 폴더 Context Menu ── -->
+  <div id="ctx-dir-menu">
+    <div class="ctx-item" id="ctxd-newnote">이 폴더에 새 노트</div>
+    <div class="ctx-item" id="ctxd-newfolder">새 하위 폴더</div>
+    <hr class="ctx-sep">
+    <div class="ctx-item" id="ctxd-rename">이름 변경</div>
+    <hr class="ctx-sep">
+    <div class="ctx-item ctx-danger" id="ctxd-delete">폴더 삭제</div>
+  </div>
+
+  <!-- ── 슬래시 명령 메뉴 ── -->
+  <div id="slash-menu"></div>
+
   <!-- ── Status Bar ── -->
   <!-- ── 테마 피커 ── -->
   <div id="theme-panel">
@@ -812,6 +836,8 @@ export function buildHtml(
     var tagsClearBtn = document.getElementById('tags-clear-btn');
     var blSection    = document.getElementById('backlinks-section');
     var blList       = document.getElementById('backlinks-list');
+    var olSection    = document.getElementById('outlinks-section');
+    var olList       = document.getElementById('outlinks-list');
     var qsSwitcher   = document.getElementById('quick-switcher');
     var qsInput      = document.getElementById('qs-input');
     var qsResults    = document.getElementById('qs-results');
@@ -873,6 +899,8 @@ export function buildHtml(
     /* ── ESC 처리 (Electron main도 이 함수를 호출) ──
        최상위 UI 하나만 닫고 true 반환. 닫을 것이 없으면 false (아무 일도 안 함) */
     window.__handleEsc = function() {
+      var slm = document.getElementById('slash-menu');
+      if (slm && slm.classList.contains('visible')) { slm.classList.remove('visible'); return true; }
       var lac = document.getElementById('link-autocomplete');
       if (lac && lac.classList.contains('visible')) { lac.classList.remove('visible'); return true; }
       var ae = document.activeElement;
@@ -886,6 +914,8 @@ export function buildHtml(
       if (nfModal && nfModal.classList.contains('open')) { closeNewFile(); return true; }
       var ctx = document.getElementById('ctx-menu');
       if (ctx && ctx.classList.contains('visible')) { ctx.classList.remove('visible'); return true; }
+      var ctxd = document.getElementById('ctx-dir-menu');
+      if (ctxd && ctxd.classList.contains('visible')) { ctxd.classList.remove('visible'); return true; }
       return false;
     };
 
@@ -944,9 +974,10 @@ export function buildHtml(
 
     /* ── 에디터 ──────────────────────── */
     editor.addEventListener('keydown', function(e) {
-      // [[링크 자동완성이 열려 있으면 해당 키는 자동완성이 처리
+      // [[자동완성·슬래시 메뉴가 열려 있으면 해당 키는 그쪽 핸들러가 처리
       var lacEl = document.getElementById('link-autocomplete');
-      if (lacEl && lacEl.classList.contains('visible')
+      var slmEl = document.getElementById('slash-menu');
+      if (((lacEl && lacEl.classList.contains('visible')) || (slmEl && slmEl.classList.contains('visible')))
           && (e.key==='Enter'||e.key==='Tab'||e.key==='ArrowDown'||e.key==='ArrowUp')) return;
 
       if (e.key==='Tab') {
@@ -1118,9 +1149,21 @@ export function buildHtml(
           e.preventDefault();
           loadFile(this.dataset.rel, this.dataset.abs);
         });
+        a.addEventListener('dragstart', function(e) {
+          e.dataTransfer.setData('text/plain', this.dataset.rel);
+          e.dataTransfer.effectAllowed = 'move';
+        });
       });
       treeRoot.querySelectorAll('.tree-dir-label').forEach(function(el) {
         el.addEventListener('click', function() { toggleDir(this); });
+        el.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('drop-hover'); });
+        el.addEventListener('dragleave', function() { this.classList.remove('drop-hover'); });
+        el.addEventListener('drop', function(e) {
+          e.preventDefault();
+          this.classList.remove('drop-hover');
+          var rel = e.dataTransfer.getData('text/plain');
+          if (rel) moveFile(rel, this.dataset.dir || '');
+        });
       });
       treeRoot.querySelectorAll('.bookmark-btn').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
@@ -1129,6 +1172,102 @@ export function buildHtml(
           updateBookmarkBtns();
         });
       });
+    }
+
+    // 트리 헤더("파일" 행)에 드롭 → 루트로 이동
+    (function() {
+      var row = treeSection ? treeSection.querySelector('.sb-title-row') : null;
+      if (!row) return;
+      row.addEventListener('dragover', function(e) { e.preventDefault(); row.classList.add('drop-hover'); });
+      row.addEventListener('dragleave', function() { row.classList.remove('drop-hover'); });
+      row.addEventListener('drop', function(e) {
+        e.preventDefault();
+        row.classList.remove('drop-hover');
+        var rel = e.dataTransfer.getData('text/plain');
+        if (rel) moveFile(rel, '');
+      });
+    })();
+
+    /* ── 파일 이동 (드래그&드롭) ─────── */
+    async function moveFile(rel, dir) {
+      var curDir = rel.indexOf('/') >= 0 ? rel.slice(0, rel.lastIndexOf('/')) : '';
+      if (curDir === dir) return; // 같은 폴더로의 이동은 무시
+      try {
+        var res = await fetch('/api/files/move', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ path: rel, dir: dir })
+        });
+        if (!res.ok) {
+          var ed = null; try { ed = await res.json(); } catch(e2) {}
+          throw new Error((ed && ed.error) || ('HTTP ' + res.status));
+        }
+        var d = await res.json();
+        if (currentRel === rel) {
+          currentRel = d.relativePath;
+          currentPath = d.absolutePath;
+          history.replaceState({file: currentRel}, '', '/?file=' + encodeURIComponent(currentRel));
+        }
+        var recents = getRecents().map(function(r) {
+          return r.relativePath === rel
+            ? { name: r.name, relativePath: d.relativePath, absolutePath: d.absolutePath } : r;
+        });
+        localStorage.setItem('mdv-recents', JSON.stringify(recents));
+        renderRecents();
+        statusText.textContent = '이동됨: ' + d.relativePath;
+      } catch(err) { statusText.textContent = '이동 실패: ' + err.message; }
+    }
+
+    /* ── 폴더 생성/이름변경/삭제 ─────── */
+    window.newFolderPrompt = function(parent) {
+      var name = prompt('새 폴더 이름');
+      if (!name || !name.trim()) return;
+      var p = (parent ? parent + '/' : '') + name.trim();
+      fetch('/api/dirs/new', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ path: p })
+      }).then(function(r) {
+        if (!r.ok) throw new Error('폴더 생성 실패');
+        statusText.textContent = '폴더 생성됨: ' + p;
+      }).catch(function(err) { statusText.textContent = err.message; });
+    };
+
+    function renameFolder(dir) {
+      var cur = dir.split('/').pop();
+      var name = prompt('폴더 이름 변경', cur);
+      if (!name || !name.trim() || name.trim() === cur) return;
+      fetch('/api/dirs/rename', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ path: dir, newName: name.trim() })
+      }).then(function(r) {
+        if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '이름 변경 실패'); });
+        return r.json();
+      }).then(function(d) {
+        // 현재 노트가 해당 폴더 안이면 경로 갱신
+        if (currentRel && (currentRel === dir || currentRel.indexOf(dir + '/') === 0)) {
+          currentRel = d.path + currentRel.slice(dir.length);
+          history.replaceState({file: currentRel}, '', '/?file=' + encodeURIComponent(currentRel));
+        }
+      }).catch(function(err) { statusText.textContent = err.message; });
+    }
+
+    function deleteFolder(dir) {
+      if (!confirm('"' + dir + '" 폴더와 안의 모든 파일이 삭제됩니다. 계속할까요?')) return;
+      fetch('/api/dirs?dir=' + encodeURIComponent(dir), { method: 'DELETE' })
+        .then(function(r) {
+          if (!r.ok) return r.json().then(function(d) { throw new Error(d.error || '삭제 실패'); });
+          if (currentRel && currentRel.indexOf(dir + '/') === 0) {
+            mdEl.innerHTML = '<p style="color:var(--muted);padding:24px 0">파일이 삭제되었습니다.</p>';
+            currentRel = ''; currentPath = '';
+            syncInlineTitle('');
+            if (filepathName) filepathName.textContent = '';
+            if (filepath) filepath.style.display = 'none';
+            if (headerSep) headerSep.style.display = 'none';
+            document.title = 'MdPad';
+          }
+          var recents = getRecents().filter(function(r) { return r.relativePath.indexOf(dir + '/') !== 0; });
+          localStorage.setItem('mdv-recents', JSON.stringify(recents));
+          renderRecents();
+        }).catch(function(err) { statusText.textContent = err.message; });
     }
 
     if (cfg.isDir && cfg.tree && cfg.tree.children && cfg.tree.children.length) {
@@ -1144,7 +1283,7 @@ export function buildHtml(
         if (n.type === 'dir') {
           var id = 'dir-' + esc(prefix + n.name).replace(/[^a-zA-Z0-9]/g,'-');
           html += '<li class="tree-dir">'
-            + '<div class="tree-dir-label" data-id="' + id + '" style="padding-left:' + pl + '">'
+            + '<div class="tree-dir-label" data-id="' + id + '" data-dir="' + esc(n.path) + '" style="padding-left:' + pl + '">'
             + '<span class="tree-arrow" id="arr-' + id + '">▶</span>'
             + '<span>' + esc(n.name) + '</span></div>'
             + '<ul class="tree-children tree-list" id="' + id + '" style="--guide:' + (23 + d * 14) + 'px">'
@@ -1156,7 +1295,7 @@ export function buildHtml(
           var isBm = bms.some(function(b){ return b.relativePath === n.path; });
           var displayName = esc(n.name.replace(/\\.md$/i,''));
           html += '<li class="tree-file">'
-            + '<a href="#" data-rel="' + esc(n.path) + '" data-abs="' + esc(n.absPath) + '"'
+            + '<a href="#" draggable="true" data-rel="' + esc(n.path) + '" data-abs="' + esc(n.absPath) + '"'
             + ' class="' + (isActive ? 'active' : '') + '" style="padding-left:' + pl + '">'
             + displayName + '</a>'
             + '<button class="bookmark-btn' + (isBm ? ' bookmarked' : '') + '"'
@@ -1258,6 +1397,35 @@ export function buildHtml(
       if (!container) return;
       container.querySelectorAll('a.wiki-link').forEach(function(a) {
         a.classList.toggle('unresolved', !resolveNote(a.dataset.target || ''));
+      });
+    }
+
+    /* ── 아웃고잉 링크 패널 ──────────── */
+    function renderOutlinks() {
+      if (!olSection || !olList) return;
+      var seen = {};
+      var items = [];
+      mdEl.querySelectorAll('a.wiki-link').forEach(function(a) {
+        if (a.closest('.embed-note')) return;
+        var t = (a.dataset.target || '').trim();
+        if (!t || seen[t.toLowerCase()]) return;
+        seen[t.toLowerCase()] = 1;
+        items.push({ target: t, file: resolveNote(t) });
+      });
+      if (!items.length) { olSection.style.display = 'none'; return; }
+      olSection.style.display = 'block';
+      olList.innerHTML = items.map(function(it) {
+        var label = it.file
+          ? esc(it.file.name.replace(/\\.md$/i, ''))
+          : esc(it.target) + ' <span style="opacity:.55;font-size:10px">(미생성)</span>';
+        return '<li><a href="#" data-target="' + esc(it.target) + '"'
+          + (it.file ? '' : ' style="opacity:.55"') + '>' + label + '</a></li>';
+      }).join('');
+      olList.querySelectorAll('a').forEach(function(a) {
+        a.addEventListener('click', function(e) {
+          e.preventDefault();
+          openWikiTarget(this.dataset.target);
+        });
       });
     }
 
@@ -1447,6 +1615,7 @@ export function buildHtml(
       applyFoldButtons();
       wireTaskCheckboxes();
       markUnresolvedLinks(mdEl);
+      renderOutlinks();
       if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
     }
 
@@ -1705,6 +1874,7 @@ export function buildHtml(
     var COMMANDS = [
       { name:'데일리 노트 열기',      hint:'오늘 날짜 노트',   dirOnly:true, run:function(){ openDailyNote(); } },
       { name:'새 노트 만들기',        hint:'폴더/이름 가능',   dirOnly:true, run:function(){ openNewFile(); } },
+      { name:'새 폴더 만들기',        dirOnly:true, run:function(){ window.newFolderPrompt(''); } },
       { name:'랜덤 노트 열기',        dirOnly:true, run:function(){ openRandomNote(); } },
       { name:'빠른 파일 열기',        hint:'Ctrl+P',          dirOnly:true, run:function(){ openQuickSwitcher(); } },
       { name:'전체 검색',             hint:'Ctrl+Shift+F',    dirOnly:true, run:function(){ openSearch(); } },
@@ -1730,10 +1900,23 @@ export function buildHtml(
     window.openCmdPalette  = openCmdPalette;
     window.closeCmdPalette = closeCmdPalette;
 
+    // templates/ 폴더의 노트를 "템플릿 삽입" 명령으로 노출
+    function templateCommands() {
+      return (cfg.files || []).filter(function(f) {
+        return /^templates\\//i.test(f.relativePath.replace(/\\\\/g, '/'));
+      }).map(function(f) {
+        return {
+          name: '템플릿 삽입: ' + f.name.replace(/\\.md$/i, ''),
+          hint: 'templates/', dirOnly: true,
+          run: (function(rel) { return function() { insertTemplate(rel); }; })(f.relativePath)
+        };
+      });
+    }
+
     function renderCpResults(q) {
       if (!cpResults) return;
       var query = (q || '').toLowerCase().trim();
-      cpFiltered = COMMANDS.filter(function(c) {
+      cpFiltered = COMMANDS.concat(templateCommands()).filter(function(c) {
         if (c.dirOnly && !cfg.isDir) return false;
         return !query || c.name.toLowerCase().indexOf(query) >= 0;
       });
@@ -1796,6 +1979,28 @@ export function buildHtml(
         statusText.textContent = '경로 복사됨';
         setTimeout(function(){ statusText.textContent = '연결됨'; }, 2000);
       }).catch(function(){});
+    }
+
+    /* ── 템플릿 삽입 ({{date}} {{time}} {{title}}) ── */
+    async function insertTemplate(rel) {
+      try {
+        var res = await fetch('/api/raw?file=' + encodeURIComponent(rel));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var d = await res.json();
+        var now = new Date();
+        function p2(n) { return String(n).padStart(2, '0'); }
+        var text = d.content
+          .replace(/\\{\\{date\\}\\}/g, now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate()))
+          .replace(/\\{\\{time\\}\\}/g, p2(now.getHours()) + ':' + p2(now.getMinutes()))
+          .replace(/\\{\\{title\\}\\}/g, currentRel ? (currentRel.split('/').pop() || '').replace(/\\.md$/i, '') : '');
+        if (currentMode === 'view') setMode('split');
+        if (!editor.value && currentRel) await loadEditorContent(currentRel);
+        var pos = editor.selectionStart || editor.value.length;
+        editor.value = editor.value.slice(0, pos) + text + editor.value.slice(pos);
+        editor.selectionStart = editor.selectionEnd = pos + text.length;
+        editor.focus();
+        editor.dispatchEvent(new Event('input'));
+      } catch(err) { statusText.textContent = '템플릿 삽입 실패: ' + err.message; }
     }
 
     /* ── Full-text Search ────────────── */
@@ -2107,6 +2312,152 @@ export function buildHtml(
       });
     })();
 
+    /* ── 슬래시 명령 (에디터에서 / 입력) ───── */
+    (function() {
+      var menu = document.getElementById('slash-menu');
+      if (!menu || !editor) return;
+      var idx = -1;
+      var start = -1;
+      var filtered = [];
+
+      function p2(n) { return String(n).padStart(2, '0'); }
+      function today() {
+        var d = new Date();
+        return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
+      }
+
+      var ITEMS = [
+        { name: '제목 1',      kw: 'h1 heading',   pre: '# ' },
+        { name: '제목 2',      kw: 'h2 heading',   pre: '## ' },
+        { name: '제목 3',      kw: 'h3 heading',   pre: '### ' },
+        { name: '체크박스',    kw: 'todo task',    pre: '- [ ] ' },
+        { name: '글머리 목록', kw: 'ul bullet',    pre: '- ' },
+        { name: '번호 목록',   kw: 'ol number',    pre: '1. ' },
+        { name: '인용',        kw: 'quote',        pre: '> ' },
+        { name: '코드 블록',   kw: 'code',         pre: '\\n', post: '\\n\\n' },
+        { name: '표',          kw: 'table',        pre: '| 열1 | 열2 |\\n| --- | --- |\\n| ', post: ' |  |\\n' },
+        { name: '콜아웃',      kw: 'callout note', pre: '> [!note] ', post: '\\n> ' },
+        { name: '구분선',      kw: 'hr divider',   pre: '---\\n' },
+        { name: '위키링크',    kw: 'link wiki',    pre: '[[', post: ']]' },
+        { name: '오늘 날짜',   kw: 'date today',   dyn: today }
+      ];
+      // 코드 블록의 백틱은 문자열 조립로 구성 (템플릿 리터럴 충돌 회피)
+      var FENCE = String.fromCharCode(96, 96, 96);
+      ITEMS[7].pre = FENCE + '\\n';
+      ITEMS[7].post = '\\n' + FENCE + '\\n';
+
+      function close() { menu.classList.remove('visible'); idx = -1; }
+
+      function hl(items) {
+        for (var i = 0; i < items.length; i++) items[i].classList.toggle('active', i === idx);
+        if (items[idx]) items[idx].scrollIntoView({ block: 'nearest' });
+      }
+
+      function apply(i) {
+        var it = filtered[i];
+        if (!it) { close(); return; }
+        var pos = editor.selectionStart;
+        var ins = it.dyn ? it.dyn() : (it.pre || '');
+        var post = it.post || '';
+        editor.value = editor.value.slice(0, start) + ins + post + editor.value.slice(pos);
+        var cp = start + ins.length;
+        editor.selectionStart = editor.selectionEnd = cp;
+        close();
+        editor.focus();
+        editor.dispatchEvent(new Event('input'));
+      }
+
+      function open(items) {
+        idx = 0;
+        menu.innerHTML = items.map(function(it, i) {
+          return '<div class="lac-item' + (i === 0 ? ' active' : '') + '" data-i="' + i + '">' + esc(it.name) + '</div>';
+        }).join('');
+        menu.querySelectorAll('.lac-item').forEach(function(el) {
+          el.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            apply(parseInt(this.dataset.i, 10));
+          });
+        });
+        var rect = editor.getBoundingClientRect();
+        var beforeText = editor.value.slice(0, editor.selectionStart);
+        var lines = beforeText.split('\\n');
+        var style = window.getComputedStyle(editor);
+        var lineH = parseFloat(style.lineHeight) || 20;
+        var padT = parseFloat(style.paddingTop) || 0;
+        var padL = parseFloat(style.paddingLeft) || 0;
+        var fontSize = parseFloat(style.fontSize) || 13;
+        var x = rect.left + padL + lines[lines.length - 1].length * fontSize * 0.55;
+        var y = rect.top + padT + lines.length * lineH - editor.scrollTop;
+        if (x > window.innerWidth - 240) x = window.innerWidth - 248;
+        if (y > window.innerHeight - 300) y = y - 300;
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.classList.add('visible');
+      }
+
+      editor.addEventListener('input', function() {
+        var pos = editor.selectionStart;
+        var before = editor.value.slice(0, pos);
+        var m = before.match(/(^|[\\s])\\/([\\w가-힣]{0,20})$/);
+        if (!m) { close(); return; }
+        var lacEl = document.getElementById('link-autocomplete');
+        if (lacEl && lacEl.classList.contains('visible')) { close(); return; }
+        start = pos - m[2].length - 1;
+        var q = m[2].toLowerCase();
+        filtered = ITEMS.filter(function(it) {
+          return !q || it.name.toLowerCase().indexOf(q) >= 0 || it.kw.indexOf(q) >= 0;
+        });
+        if (!filtered.length) { close(); return; }
+        open(filtered);
+      });
+
+      editor.addEventListener('keydown', function(e) {
+        if (!menu.classList.contains('visible')) return;
+        var items = menu.querySelectorAll('.lac-item');
+        if (e.key === 'ArrowDown')      { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); hl(items); }
+        else if (e.key === 'ArrowUp')   { e.preventDefault(); idx = Math.max(idx - 1, 0); hl(items); }
+        else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); apply(idx >= 0 ? idx : 0); }
+      });
+
+      document.addEventListener('click', function(e) {
+        if (menu && !menu.contains(e.target)) close();
+      });
+    })();
+
+    /* ── 이미지 붙여넣기 → attachments/ 저장 ── */
+    editor.addEventListener('paste', function(e) {
+      var items = e.clipboardData && e.clipboardData.items;
+      if (!items || !cfg.isDir) return;
+      var imgItem = null;
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file' && items[i].type.indexOf('image/') === 0) { imgItem = items[i]; break; }
+      }
+      if (!imgItem) return;
+      e.preventDefault();
+      var ext = (imgItem.type.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/[^a-z0-9]/g, '');
+      var blob = imgItem.getAsFile();
+      if (!blob) return;
+      statusText.textContent = '이미지 업로드 중...';
+      var reader = new FileReader();
+      reader.onload = function() {
+        var b64 = String(reader.result).split(',')[1];
+        fetch('/api/attach', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ ext: ext, data: b64 })
+        }).then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('업로드 실패')); })
+          .then(function(d) {
+            var pos = editor.selectionStart;
+            var md = '![](' + d.relativePath + ')';
+            editor.value = editor.value.slice(0, pos) + md + editor.value.slice(editor.selectionEnd);
+            editor.selectionStart = editor.selectionEnd = pos + md.length;
+            editor.dispatchEvent(new Event('input'));
+            statusText.textContent = '이미지 저장됨: ' + d.relativePath;
+          })
+          .catch(function(err) { statusText.textContent = err.message; });
+      };
+      reader.readAsDataURL(blob);
+    });
+
     /* ── New File Modal ──────────────── */
     function openNewFile() {
       if (!nfModal || !cfg.isDir) return;
@@ -2182,6 +2533,7 @@ export function buildHtml(
           rebuildTree();
           loadTags();
           markUnresolvedLinks(mdEl);
+          renderOutlinks();
         } else if (msg.type === 'update') {
           if (msg.path && currentPath && msg.path !== currentPath) return;
           if (currentMode !== 'view' && Date.now() - lastEditTime < 2000) return;
@@ -2323,28 +2675,69 @@ export function buildHtml(
 
     /* ── 컨텍스트 메뉴 (이름변경/삭제) ──────── */
     var ctxMenu      = document.getElementById('ctx-menu');
+    var ctxDirMenu   = document.getElementById('ctx-dir-menu');
     var ctxTarget    = null;
+    var ctxDirTarget = null;
+
+    function placeCtxMenu(menu, x, y) {
+      var mw = 170, mh = 150, vw = window.innerWidth, vh = window.innerHeight;
+      menu.style.left = (x + mw > vw - 4 ? x - mw : x) + 'px';
+      menu.style.top  = (y + mh > vh - 4 ? y - mh : y) + 'px';
+      menu.classList.add('visible');
+    }
 
     document.addEventListener('contextmenu', function(e) {
       if (!ctxMenu) return;
-      var a = e.target && e.target.closest ? e.target.closest('.tree-file a') : null;
-      if (!a) { ctxMenu.classList.remove('visible'); return; }
-      e.preventDefault();
-      ctxTarget = { rel: a.dataset.rel, abs: a.dataset.abs, name: a.textContent.trim(), el: a };
-      var x = e.clientX, y = e.clientY;
-      var mw = 160, mh = 80, vw = window.innerWidth, vh = window.innerHeight;
-      ctxMenu.style.left = (x + mw > vw - 4 ? x - mw : x) + 'px';
-      ctxMenu.style.top  = (y + mh > vh - 4 ? y - mh : y) + 'px';
-      ctxMenu.classList.add('visible');
+      var a  = e.target && e.target.closest ? e.target.closest('.tree-file a') : null;
+      var dl = e.target && e.target.closest ? e.target.closest('.tree-dir-label') : null;
+      ctxMenu.classList.remove('visible');
+      if (ctxDirMenu) ctxDirMenu.classList.remove('visible');
+      if (a) {
+        e.preventDefault();
+        ctxTarget = { rel: a.dataset.rel, abs: a.dataset.abs, name: a.textContent.trim(), el: a };
+        placeCtxMenu(ctxMenu, e.clientX, e.clientY);
+      } else if (dl && ctxDirMenu && dl.dataset.dir) {
+        e.preventDefault();
+        ctxDirTarget = dl.dataset.dir;
+        placeCtxMenu(ctxDirMenu, e.clientX, e.clientY);
+      }
     });
 
     document.addEventListener('click', function(e) {
       if (ctxMenu && !ctxMenu.contains(e.target)) ctxMenu.classList.remove('visible');
+      if (ctxDirMenu && !ctxDirMenu.contains(e.target)) ctxDirMenu.classList.remove('visible');
       var tp = document.getElementById('theme-panel');
       var tb = document.getElementById('theme-btn');
       if (tp && tp.classList.contains('open') && !tp.contains(e.target) && e.target !== tb)
         tp.classList.remove('open');
     });
+
+    /* 폴더 메뉴 동작 */
+    (function() {
+      var nn = document.getElementById('ctxd-newnote');
+      var nf = document.getElementById('ctxd-newfolder');
+      var rn = document.getElementById('ctxd-rename');
+      var dl = document.getElementById('ctxd-delete');
+      function hide() { if (ctxDirMenu) ctxDirMenu.classList.remove('visible'); }
+      if (nn) nn.addEventListener('click', function() {
+        hide();
+        if (ctxDirTarget === null) return;
+        openNewFile();
+        if (nfDir) nfDir.value = ctxDirTarget;
+      });
+      if (nf) nf.addEventListener('click', function() {
+        hide();
+        if (ctxDirTarget !== null) window.newFolderPrompt(ctxDirTarget);
+      });
+      if (rn) rn.addEventListener('click', function() {
+        hide();
+        if (ctxDirTarget !== null) renameFolder(ctxDirTarget);
+      });
+      if (dl) dl.addEventListener('click', function() {
+        hide();
+        if (ctxDirTarget !== null) deleteFolder(ctxDirTarget);
+      });
+    })();
 
     var ctxOpenBtn     = document.getElementById('ctx-open');
     var ctxCopyPath    = document.getElementById('ctx-copy-path');
@@ -2423,6 +2816,10 @@ export function buildHtml(
           });
           localStorage.setItem('mdv-recents', JSON.stringify(recents));
           renderRecents();
+          if (d.updatedLinks && statusText) {
+            statusText.textContent = '위키링크 업데이트: ' + d.updatedLinks + '개 파일';
+            setTimeout(function(){ statusText.textContent = '연결됨'; }, 3000);
+          }
         }).catch(function(err) { if (statusText) statusText.textContent = err.message; });
       }
       function cancelRename() {
