@@ -4,7 +4,7 @@ import fastifyWebSocket from '@fastify/websocket';
 import type { WebSocket } from 'ws';
 import { resolve, relative, dirname, basename, sep, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readFile, writeFile, rename, unlink } from 'node:fs/promises';
+import { readFile, writeFile, rename, unlink, mkdir } from 'node:fs/promises';
 import { bus, type TocItem } from '../bus.js';
 import { buildHtml } from '../server/template.js';
 import type { RenderAgent } from './RenderAgent.js';
@@ -294,14 +294,19 @@ export class ServerAgent {
       if (!this.isDir) return reply.code(400).send({ error: '디렉토리 모드에서만 사용 가능' });
       const { dir = '', name } = req.body as { dir?: string; name: string };
       if (!name) return reply.code(400).send({ error: '파일명이 필요합니다' });
-      const safeName = name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
-      if (!safeName) return reply.code(400).send({ error: '유효하지 않은 파일명' });
+      // "폴더/노트" 형태 허용: 세그먼트별로 정리 후 중간 폴더는 자동 생성
+      const segs = name.replace(/\\/g, '/').split('/')
+        .map((s) => s.replace(/[<>:"|?*\x00-\x1f]/g, '').trim())
+        .filter((s) => s && s !== '.' && s !== '..');
+      if (!segs.length) return reply.code(400).send({ error: '유효하지 않은 파일명' });
+      const safeName = segs.pop() as string;
       const filename = safeName.endsWith('.md') ? safeName : safeName + '.md';
-      const absDir = dir ? resolve(this.rootDir, dir) : this.rootDir;
+      const absDir = resolve(this.rootDir, dir || '.', ...segs);
       const abs = join(absDir, filename);
       if (!this.isSafePath(abs)) return reply.code(403).send({ error: '허용되지 않는 경로' });
       const rel = relative(this.rootDir, abs).replace(/\\/g, '/');
       try {
+        if (absDir !== this.rootDir) await mkdir(absDir, { recursive: true });
         await writeFile(abs, `# ${safeName.replace(/\.md$/i, '')}\n\n`, { flag: 'wx' });
         const newEntry = { name: filename, relativePath: rel, absolutePath: abs };
         this.fileList.push(newEntry);

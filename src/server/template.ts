@@ -333,6 +333,11 @@ export function buildHtml(
     /* ── Wiki Link ────────────────────────────── */
     .wiki-link { color:var(--accent);text-decoration:none;border-bottom:1px dashed currentColor;opacity:.85; }
     .wiki-link:hover { opacity:1;border-bottom-style:solid; }
+    .wiki-link.unresolved { opacity:.45;border-bottom-style:dotted; }
+    .wiki-link.unresolved:hover { opacity:.7; }
+
+    /* ── 체크박스 토글 (미리보기에서 클릭 가능) ── */
+    #markdown input[type=checkbox]:not(:disabled) { cursor:pointer; }
 
     /* ── Embedded Notes (![[file]]) ───────────── */
     .embed-note {
@@ -365,23 +370,24 @@ export function buildHtml(
     .fold-toggle.folded { transform:rotate(-90deg); }
     .folded-content { display:none !important; }
 
-    /* ── Quick Switcher ───────────────────────── */
-    #quick-switcher {
+    /* ── Quick Switcher · 명령 팔레트 ──────────── */
+    #quick-switcher, #cmd-palette {
       display:none; position:fixed; inset:0; z-index:2000;
       background:rgba(0,0,0,.55); backdrop-filter:blur(4px);
       align-items:flex-start; justify-content:center; padding-top:80px;
     }
-    #quick-switcher.open { display:flex; }
-    #qs-box {
+    #quick-switcher.open, #cmd-palette.open { display:flex; }
+    #qs-box, #cp-box {
       background:var(--hdr-bg); border:1px solid var(--border); border-radius:10px;
       width:min(580px,90vw); overflow:hidden;
       box-shadow:0 20px 60px rgba(0,0,0,.5);
     }
-    #qs-input {
+    #qs-input, #cp-input {
       width:100%; background:none; border:none; border-bottom:1px solid var(--border);
       color:var(--hdr-fg); font-size:16px; padding:14px 16px; outline:none;
     }
-    #qs-results { max-height:360px; overflow-y:auto; }
+    #qs-results, #cp-results { max-height:360px; overflow-y:auto; }
+    .qs-hintkey { opacity:.45; font-size:11px; font-family:'SFMono-Regular',Consolas,monospace; }
     .qs-item {
       padding:9px 16px; cursor:pointer; color:var(--hdr-fg); font-size:13px;
       display:flex; align-items:center; gap:8px; border-left:3px solid transparent;
@@ -391,7 +397,7 @@ export function buildHtml(
     .qs-name { flex:1; }
     .qs-path { opacity:.4; font-size:11px; text-align:right; max-width:200px;
                overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    #qs-hint { padding:8px 16px; font-size:11px; color:var(--muted);
+    #qs-hint, #cp-hint { padding:8px 16px; font-size:11px; color:var(--muted);
                border-top:1px solid var(--border); text-align:center; }
 
     /* ── Full-text Search ─────────────────────── */
@@ -648,6 +654,7 @@ export function buildHtml(
                   + '<div style="font-size:13px">왼쪽 파일 목록에서 노트를 선택하세요</div>'
                   + '<div style="font-size:12px;margin-top:14px;display:flex;flex-direction:column;gap:7px;align-items:center">'
                   + '<span><kbd>Ctrl+P</kbd>&nbsp; 빠른 파일 열기</span>'
+                  + '<span><kbd>Ctrl+Shift+P</kbd>&nbsp; 명령 팔레트</span>'
                   + '<span><kbd>Ctrl+Shift+F</kbd>&nbsp; 전체 검색</span>'
                   + '<span><kbd>V</kbd> <kbd>S</kbd> <kbd>E</kbd>&nbsp; 보기 · 분할 · 편집 전환</span>'
                   + '</div></div>'
@@ -663,6 +670,15 @@ export function buildHtml(
       <input id="qs-input" placeholder="파일 이름으로 검색..." autocomplete="off">
       <div id="qs-results"></div>
       <div id="qs-hint">↑↓ 탐색 · Enter 열기 · Esc 닫기</div>
+    </div>
+  </div>
+
+  <!-- ── 명령 팔레트 ── -->
+  <div id="cmd-palette" onclick="if(event.target===this)closeCmdPalette()">
+    <div id="cp-box">
+      <input id="cp-input" placeholder="명령 입력..." autocomplete="off">
+      <div id="cp-results"></div>
+      <div id="cp-hint">↑↓ 탐색 · Enter 실행 · Esc 닫기</div>
     </div>
   </div>
 
@@ -806,6 +822,9 @@ export function buildHtml(
     var nfModal      = document.getElementById('newfile-modal');
     var nfName       = document.getElementById('newfile-name');
     var nfDir        = document.getElementById('newfile-dir');
+    var cmdPal       = document.getElementById('cmd-palette');
+    var cpInput      = document.getElementById('cp-input');
+    var cpResults    = document.getElementById('cp-results');
 
     var cfg          = JSON.parse(document.getElementById('mdv-config').textContent||'{}');
     var currentPath  = cfg.currentPath||'';
@@ -862,6 +881,7 @@ export function buildHtml(
       if (tp && tp.classList.contains('open')) { tp.classList.remove('open'); return true; }
       if (grOverlay && grOverlay.classList.contains('open')) { closeGraph(); return true; }
       if (srOverlay && srOverlay.classList.contains('open')) { closeSearch(); return true; }
+      if (cmdPal && cmdPal.classList.contains('open')) { closeCmdPalette(); return true; }
       if (qsSwitcher && qsSwitcher.classList.contains('open')) { closeQuickSwitcher(); return true; }
       if (nfModal && nfModal.classList.contains('open')) { closeNewFile(); return true; }
       var ctx = document.getElementById('ctx-menu');
@@ -875,8 +895,13 @@ export function buildHtml(
       if ((e.ctrlKey||e.metaKey) && e.key==='s') { e.preventDefault(); saveFile(); return; }
       // Ctrl+P Quick Switcher
       if ((e.ctrlKey||e.metaKey) && !e.shiftKey && e.key==='p') { e.preventDefault(); openQuickSwitcher(); return; }
+      // Ctrl+Shift+P 명령 팔레트
+      if ((e.ctrlKey||e.metaKey) && e.shiftKey && (e.key==='P'||e.key==='p')) { e.preventDefault(); openCmdPalette(); return; }
       // Ctrl+Shift+F 전체 검색
       if ((e.ctrlKey||e.metaKey) && e.shiftKey && (e.key==='F'||e.key==='f')) { e.preventDefault(); openSearch(); return; }
+      // Alt+←/→ 뒤로/앞으로 탐색
+      if (e.altKey && e.key==='ArrowLeft')  { e.preventDefault(); history.back(); return; }
+      if (e.altKey && e.key==='ArrowRight') { e.preventDefault(); history.forward(); return; }
 
       // ESC — 최상위 오버레이만 닫기 (기본 동작 차단: 창/앱이 닫히지 않도록)
       if (e.key==='Escape') {
@@ -900,8 +925,17 @@ export function buildHtml(
         if (e.key==='Enter')     { e.preventDefault(); selectSr(); return; }
       }
 
-      // 모드 단축키 (에디터 포커스 없을 때)
-      if (!e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== editor) {
+      // 명령 팔레트 내비게이션
+      if (cmdPal && cmdPal.classList.contains('open')) {
+        if (e.key==='ArrowDown') { e.preventDefault(); moveCp(1); return; }
+        if (e.key==='ArrowUp')   { e.preventDefault(); moveCp(-1); return; }
+        if (e.key==='Enter')     { e.preventDefault(); selectCp(); return; }
+      }
+
+      // 모드 단축키 (에디터/입력 필드 포커스 없을 때)
+      var ae = document.activeElement;
+      var typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT');
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && !typing) {
         if (e.key==='v') setMode('view');
         else if (e.key==='s') setMode('split');
         else if (e.key==='e') setMode('edit');
@@ -910,11 +944,110 @@ export function buildHtml(
 
     /* ── 에디터 ──────────────────────── */
     editor.addEventListener('keydown', function(e) {
+      // [[링크 자동완성이 열려 있으면 해당 키는 자동완성이 처리
+      var lacEl = document.getElementById('link-autocomplete');
+      if (lacEl && lacEl.classList.contains('visible')
+          && (e.key==='Enter'||e.key==='Tab'||e.key==='ArrowDown'||e.key==='ArrowUp')) return;
+
       if (e.key==='Tab') {
         e.preventDefault();
         var s=editor.selectionStart, en=editor.selectionEnd;
         editor.value=editor.value.slice(0,s)+'  '+editor.value.slice(en);
         editor.selectionStart=editor.selectionEnd=s+2;
+        return;
+      }
+
+      // Ctrl+Enter: 현재 줄 체크박스 토글 (없으면 체크박스 항목으로 변환)
+      if ((e.ctrlKey||e.metaKey) && e.key==='Enter') {
+        e.preventDefault();
+        var pos0 = editor.selectionStart;
+        var ls = editor.value.lastIndexOf('\\n', pos0 - 1) + 1;
+        var le = editor.value.indexOf('\\n', pos0);
+        if (le === -1) le = editor.value.length;
+        var line = editor.value.slice(ls, le);
+        var newLine;
+        var tm = line.match(/^(\\s*(?:[-*+]|\\d+[.)])\\s+\\[)([ xX])(\\]\\s?)/);
+        if (tm) {
+          newLine = line.replace(/^(\\s*(?:[-*+]|\\d+[.)])\\s+\\[)([ xX])(\\])/,
+            function(_, a, c, b) { return a + (c === ' ' ? 'x' : ' ') + b; });
+        } else {
+          var lm = line.match(/^(\\s*)([-*+]|\\d+[.)])(\\s+)(.*)$/);
+          if (lm) newLine = lm[1] + lm[2] + lm[3] + '[ ] ' + lm[4];
+          else {
+            var im = line.match(/^(\\s*)(.*)$/);
+            newLine = im[1] + '- [ ] ' + im[2];
+          }
+        }
+        editor.value = editor.value.slice(0, ls) + newLine + editor.value.slice(le);
+        var np = Math.min(pos0 + (newLine.length - line.length), ls + newLine.length);
+        editor.selectionStart = editor.selectionEnd = np;
+        editor.dispatchEvent(new Event('input'));
+        return;
+      }
+
+      // Ctrl+B/I: 굵게/기울임 · Ctrl+K: 링크 삽입
+      if ((e.ctrlKey||e.metaKey) && !e.shiftKey && (e.key==='b'||e.key==='i'||e.key==='k')) {
+        e.preventDefault();
+        var s2 = editor.selectionStart, e2 = editor.selectionEnd;
+        var sel = editor.value.slice(s2, e2);
+        if (e.key === 'k') {
+          editor.value = editor.value.slice(0, s2) + '[' + sel + ']()' + editor.value.slice(e2);
+          var cp2 = s2 + sel.length + 3; // 커서를 () 안으로
+          editor.selectionStart = editor.selectionEnd = cp2;
+        } else {
+          var w = e.key === 'b' ? '**' : '*';
+          var wl = w.length;
+          if (editor.value.slice(s2 - wl, s2) === w && editor.value.slice(e2, e2 + wl) === w) {
+            // 이미 감싸져 있으면 해제
+            editor.value = editor.value.slice(0, s2 - wl) + sel + editor.value.slice(e2 + wl);
+            editor.selectionStart = s2 - wl;
+            editor.selectionEnd = e2 - wl;
+          } else {
+            editor.value = editor.value.slice(0, s2) + w + sel + w + editor.value.slice(e2);
+            editor.selectionStart = s2 + wl;
+            editor.selectionEnd = e2 + wl;
+          }
+        }
+        editor.dispatchEvent(new Event('input'));
+        return;
+      }
+
+      // Enter: 리스트/체크박스/인용 자동 이어쓰기
+      if (e.key==='Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey
+          && editor.selectionStart === editor.selectionEnd) {
+        var pos = editor.selectionStart;
+        var lineStart = editor.value.lastIndexOf('\\n', pos - 1) + 1;
+        var cur = editor.value.slice(lineStart, pos);
+        var lim = cur.match(/^(\\s*)([-*+]|\\d+[.)])(\\s+)(\\[[ xX]\\]\\s+)?(.*)$/);
+        var qm  = !lim && cur.match(/^(\\s*(?:>\\s?)+)(.*)$/);
+        if (lim) {
+          e.preventDefault();
+          if (lim[5].trim() === '') {
+            // 빈 항목에서 Enter → 프리픽스 제거 (Obsidian 동작)
+            editor.value = editor.value.slice(0, lineStart) + editor.value.slice(pos);
+            editor.selectionStart = editor.selectionEnd = lineStart;
+          } else {
+            var bullet = lim[2];
+            var nm = bullet.match(/^(\\d+)([.)])$/);
+            if (nm) bullet = (parseInt(nm[1], 10) + 1) + nm[2];
+            var ins = '\\n' + lim[1] + bullet + lim[3] + (lim[4] ? '[ ] ' : '');
+            editor.value = editor.value.slice(0, pos) + ins + editor.value.slice(pos);
+            editor.selectionStart = editor.selectionEnd = pos + ins.length;
+          }
+          editor.dispatchEvent(new Event('input'));
+        } else if (qm) {
+          e.preventDefault();
+          if (qm[2].trim() === '') {
+            editor.value = editor.value.slice(0, lineStart) + editor.value.slice(pos);
+            editor.selectionStart = editor.selectionEnd = lineStart;
+          } else {
+            var ins2 = '\\n' + qm[1];
+            editor.value = editor.value.slice(0, pos) + ins2 + editor.value.slice(pos);
+            editor.selectionStart = editor.selectionEnd = pos + ins2.length;
+          }
+          editor.dispatchEvent(new Event('input'));
+        }
+        return;
       }
     });
 
@@ -948,7 +1081,7 @@ export function buildHtml(
         var d=await res.json();
         mdEl.innerHTML=d.html;
         if (window.__mermaidRender) window.__mermaidRender();
-        applyFoldButtons(); if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
+        enhanceMd();
         renderToc(d.toc);
       } catch(err) {}
     }
@@ -1075,7 +1208,7 @@ export function buildHtml(
         var anchor = saveAnchor();
         mdEl.innerHTML = d.html;
         if (window.__mermaidRender) window.__mermaidRender();
-        applyFoldButtons(); if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
+        enhanceMd();
         renderToc(d.toc);
         renderFm(d.frontmatter);
         restoreAnchor(anchor);
@@ -1106,6 +1239,56 @@ export function buildHtml(
         if (entry) loadFile(entry.relativePath, entry.absolutePath);
       }
     });
+
+    /* ── 위키링크: 이름 해석 · SPA 이동 · 미해결 노트 자동 생성 ── */
+    function resolveNote(target) {
+      var t = (target || '').toLowerCase().replace(/\\.md$/i, '');
+      var files = cfg.files || [];
+      var byPath = files.find(function(f) {
+        return f.relativePath.toLowerCase().replace(/\\.md$/i, '') === t;
+      });
+      if (byPath) return byPath;
+      var base = t.split('/').pop();
+      return files.find(function(f) {
+        return f.name.toLowerCase().replace(/\\.md$/i, '') === base;
+      });
+    }
+
+    function markUnresolvedLinks(container) {
+      if (!container) return;
+      container.querySelectorAll('a.wiki-link').forEach(function(a) {
+        a.classList.toggle('unresolved', !resolveNote(a.dataset.target || ''));
+      });
+    }
+
+    async function openWikiTarget(target) {
+      var f = resolveNote(target);
+      if (f) { loadFile(f.relativePath, f.absolutePath); return; }
+      if (!cfg.isDir) { statusText.textContent = '노트를 찾을 수 없습니다: ' + target; return; }
+      // 없는 노트 → 자동 생성 후 열기 (Obsidian 동작)
+      try {
+        var res = await fetch('/api/files/new', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ name: target })
+        });
+        if (!res.ok) {
+          var ed = null; try { ed = await res.json(); } catch(e2) {}
+          throw new Error((ed && ed.error) || 'HTTP ' + res.status);
+        }
+        var d = await res.json();
+        statusText.textContent = '새 노트 생성됨: ' + d.relativePath;
+        loadFile(d.relativePath, d.absolutePath);
+      } catch(err) { statusText.textContent = '노트 생성 실패: ' + err.message; }
+    }
+
+    if (mdEl) {
+      mdEl.addEventListener('click', function(e) {
+        var wl = e.target && e.target.closest ? e.target.closest('a.wiki-link') : null;
+        if (!wl) return;
+        e.preventDefault();
+        openWikiTarget(wl.dataset.target || '');
+      });
+    }
 
     /* ── TOC ─────────────────────────── */
     function renderToc(toc) {
@@ -1257,6 +1440,66 @@ export function buildHtml(
           }
         });
       });
+    }
+
+    /* ── 본문 후처리 (접기 + 체크박스 + 위키링크) ── */
+    function enhanceMd() {
+      applyFoldButtons();
+      wireTaskCheckboxes();
+      markUnresolvedLinks(mdEl);
+      if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
+    }
+
+    /* ── 작업 체크박스: 미리보기에서 클릭 → 파일에 반영 ── */
+    function wireTaskCheckboxes() {
+      var boxes = Array.prototype.filter.call(
+        mdEl.querySelectorAll('input[type=checkbox]'),
+        function(cb) { return !cb.closest('.embed-note'); });
+      boxes.forEach(function(cb, i) {
+        cb.disabled = false;
+        cb.addEventListener('change', function() { toggleTask(i, cb.checked, cb); });
+      });
+    }
+
+    async function toggleTask(idx, checked, cb) {
+      if (!currentRel) { cb.checked = !checked; return; }
+      if (modified && currentMode !== 'view') {
+        cb.checked = !checked;
+        statusText.textContent = '저장하지 않은 편집 내용이 있어 체크박스를 변경할 수 없습니다';
+        return;
+      }
+      try {
+        var res = await fetch('/api/raw?file=' + encodeURIComponent(currentRel));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var d = await res.json();
+        var lines = d.content.split('\\n');
+        var re = /^(\\s*(?:>\\s*)*(?:[-*+]|\\d+[.)])\\s+\\[)([ xX])(\\])/;
+        var inFence = false, count = -1, found = false;
+        for (var i = 0; i < lines.length; i++) {
+          if (/^\\s*(\`\`\`|~~~)/.test(lines[i])) { inFence = !inFence; continue; }
+          if (inFence) continue;
+          if (re.test(lines[i])) {
+            count++;
+            if (count === idx) {
+              lines[i] = lines[i].replace(re, function(_, a, c, b) {
+                return a + (checked ? 'x' : ' ') + b;
+              });
+              found = true;
+              break;
+            }
+          }
+        }
+        if (!found) throw new Error('원본에서 체크박스를 찾지 못했습니다');
+        var res2 = await fetch('/api/save', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ path: currentRel, content: lines.join('\\n') })
+        });
+        if (!res2.ok) throw new Error('저장 실패');
+        if (currentMode !== 'view' && !modified) { editor.value = ''; loadEditorContent(currentRel); }
+      } catch(err) {
+        cb.checked = !checked;
+        statusText.textContent = '체크박스 반영 실패: ' + err.message;
+      }
     }
 
     /* ── Word Count ──────────────────── */
@@ -1454,6 +1697,105 @@ export function buildHtml(
         qsSelected = -1;
         renderQsResults(this.value);
       });
+    }
+
+    /* ── 명령 팔레트 (Ctrl+Shift+P) ──── */
+    var cpSelected = -1;
+    var cpFiltered = [];
+    var COMMANDS = [
+      { name:'데일리 노트 열기',      hint:'오늘 날짜 노트',   dirOnly:true, run:function(){ openDailyNote(); } },
+      { name:'새 노트 만들기',        hint:'폴더/이름 가능',   dirOnly:true, run:function(){ openNewFile(); } },
+      { name:'랜덤 노트 열기',        dirOnly:true, run:function(){ openRandomNote(); } },
+      { name:'빠른 파일 열기',        hint:'Ctrl+P',          dirOnly:true, run:function(){ openQuickSwitcher(); } },
+      { name:'전체 검색',             hint:'Ctrl+Shift+F',    dirOnly:true, run:function(){ openSearch(); } },
+      { name:'그래프 뷰 열기',        dirOnly:true, run:function(){ openGraph(); } },
+      { name:'폴더 새로고침',         dirOnly:true, run:function(){ window.syncFiles(); } },
+      { name:'미리보기 모드',         hint:'V', run:function(){ setMode('view'); } },
+      { name:'분할 편집 모드',        hint:'S', run:function(){ setMode('split'); } },
+      { name:'전체 편집 모드',        hint:'E', run:function(){ setMode('edit'); } },
+      { name:'파일 저장',             hint:'Ctrl+S', run:function(){ window.saveFile(); } },
+      { name:'테마 변경',             run:function(){ window.openThemePicker(); } },
+      { name:'현재 노트 경로 복사',   run:function(){ copyCurrentNotePath(); } },
+      { name:'인쇄 / PDF 내보내기',   run:function(){ window.print(); } }
+    ];
+
+    function openCmdPalette() {
+      if (!cmdPal) return;
+      closeQuickSwitcher(); closeSearch();
+      cmdPal.classList.add('open');
+      if (cpInput) { cpInput.value = ''; cpInput.focus(); }
+      renderCpResults('');
+    }
+    function closeCmdPalette() { if (cmdPal) cmdPal.classList.remove('open'); }
+    window.openCmdPalette  = openCmdPalette;
+    window.closeCmdPalette = closeCmdPalette;
+
+    function renderCpResults(q) {
+      if (!cpResults) return;
+      var query = (q || '').toLowerCase().trim();
+      cpFiltered = COMMANDS.filter(function(c) {
+        if (c.dirOnly && !cfg.isDir) return false;
+        return !query || c.name.toLowerCase().indexOf(query) >= 0;
+      });
+      cpSelected = cpFiltered.length ? 0 : -1;
+      cpResults.innerHTML = cpFiltered.map(function(c, i) {
+        return '<div class="qs-item' + (i === 0 ? ' selected' : '') + '" data-idx="' + i + '">'
+          + '<span class="qs-name">' + esc(c.name) + '</span>'
+          + (c.hint ? '<span class="qs-hintkey">' + esc(c.hint) + '</span>' : '')
+          + '</div>';
+      }).join('');
+      cpResults.querySelectorAll('.qs-item').forEach(function(item) {
+        item.addEventListener('click', function() {
+          runCpCommand(parseInt(this.dataset.idx, 10));
+        });
+      });
+    }
+    function runCpCommand(idx) {
+      var c = cpFiltered[idx];
+      closeCmdPalette();
+      if (c) c.run();
+    }
+    function moveCp(dir) {
+      var items = cpResults ? cpResults.querySelectorAll('.qs-item') : [];
+      if (!items.length) return;
+      if (cpSelected >= 0 && items[cpSelected]) items[cpSelected].classList.remove('selected');
+      cpSelected = Math.max(0, Math.min(items.length - 1, cpSelected + dir));
+      if (items[cpSelected]) { items[cpSelected].classList.add('selected'); items[cpSelected].scrollIntoView({block:'nearest'}); }
+    }
+    function selectCp() { runCpCommand(cpSelected >= 0 ? cpSelected : 0); }
+    if (cpInput) cpInput.addEventListener('input', function() { renderCpResults(this.value); });
+
+    /* ── 데일리 노트 · 랜덤 노트 ─────── */
+    async function openDailyNote() {
+      if (!cfg.isDir) return;
+      var now = new Date();
+      var name = now.getFullYear() + '-'
+        + String(now.getMonth() + 1).padStart(2, '0') + '-'
+        + String(now.getDate()).padStart(2, '0');
+      var f = resolveNote(name);
+      if (f) { loadFile(f.relativePath, f.absolutePath); return; }
+      try {
+        var res = await fetch('/api/files/new', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ name: name })
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var d = await res.json();
+        loadFile(d.relativePath, d.absolutePath);
+      } catch(err) { statusText.textContent = '데일리 노트 생성 실패: ' + err.message; }
+    }
+    function openRandomNote() {
+      var files = cfg.files || [];
+      if (!files.length) return;
+      var f = files[Math.floor(Math.random() * files.length)];
+      loadFile(f.relativePath, f.absolutePath);
+    }
+    function copyCurrentNotePath() {
+      if (!currentRel) return;
+      navigator.clipboard.writeText(currentRel).then(function() {
+        statusText.textContent = '경로 복사됨';
+        setTimeout(function(){ statusText.textContent = '연결됨'; }, 2000);
+      }).catch(function(){});
     }
 
     /* ── Full-text Search ────────────── */
@@ -1839,13 +2181,14 @@ export function buildHtml(
           cfg.files = msg.files;
           rebuildTree();
           loadTags();
+          markUnresolvedLinks(mdEl);
         } else if (msg.type === 'update') {
           if (msg.path && currentPath && msg.path !== currentPath) return;
           if (currentMode !== 'view' && Date.now() - lastEditTime < 2000) return;
           var anchor = saveAnchor();
           mdEl.innerHTML = msg.html;
           if (window.__mermaidRender) window.__mermaidRender();
-          applyFoldButtons(); if (window.__loadEmbeds) window.__loadEmbeds(mdEl);
+          enhanceMd();
           renderToc(msg.toc);
           renderFm(msg.frontmatter);
           restoreAnchor(anchor);
@@ -1878,13 +2221,15 @@ export function buildHtml(
       var found = cfg.files.find(function(f){ return f.absolutePath === cfg.currentPath; });
       if (found) currentRel = found.relativePath;
     }
+    // 초기 노트도 히스토리에 등록 → Alt+←/→ 탐색 가능
+    if (currentRel) history.replaceState({file: currentRel}, '', '/?file=' + encodeURIComponent(currentRel));
 
     setMode(currentMode);
     connect();
     loadTags();
     loadBookmarks();
     renderRecents();
-    if (mdEl && mdEl.innerHTML.trim()) { applyFoldButtons(); loadEmbeds(mdEl); }
+    if (mdEl && mdEl.innerHTML.trim()) { enhanceMd(); }
     if (filepathName && filepathName.textContent) syncInlineTitle(filepathName.textContent);
 
     /* ── 사이드바 리사이즈 ───────────── */

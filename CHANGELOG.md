@@ -1,5 +1,31 @@
 # Changelog
 
+## v3.1.0
+
+### ⚡ Obsidian-grade Features / 옵시디언 핵심 기능
+
+**EN**
+- **Clickable task checkboxes** in preview — changes are written back to the `.md` file (code blocks skipped)
+- **Note auto-creation from wiki links** — clicking a `[[link]]` to a missing note creates and opens it; unresolved links render dimmed
+- **Command palette** (`Ctrl+Shift+P`) with daily note, random note, mode switching, theme, print and more
+- **Daily note** command creates/opens today's `YYYY-MM-DD.md`
+- **Smart editor**: auto-continue lists/checkboxes/quotes on `Enter`, `Ctrl+B`/`Ctrl+I` bold/italic, `Ctrl+K` link, `Ctrl+Enter` checkbox toggle
+- **Navigation history**: `Alt+←` / `Alt+→`
+- **Nested note creation** (`folder/sub/note`) with automatic folder creation; wiki links resolve by file name anywhere in the vault
+- Fixed `v`/`s`/`e` switching modes while typing in inputs
+
+**KO**
+- **미리보기 체크박스 클릭 반영** — `.md` 파일에 즉시 저장 (코드 블록 안은 무시)
+- **위키링크 노트 자동 생성** — 없는 노트의 `[[링크]]` 클릭 시 생성 후 열기, 미해결 링크는 흐리게 표시
+- **명령 팔레트** (`Ctrl+Shift+P`) — 데일리 노트·랜덤 노트·모드 전환·테마·인쇄 등
+- **데일리 노트** 명령으로 오늘 날짜(`YYYY-MM-DD.md`) 노트 생성/열기
+- **스마트 에디터**: `Enter` 리스트·체크박스·인용 자동 이어쓰기, `Ctrl+B`/`Ctrl+I` 서식, `Ctrl+K` 링크, `Ctrl+Enter` 체크박스 토글
+- **탐색 히스토리**: `Alt+←` / `Alt+→`
+- **하위 폴더 노트 생성** (`폴더/하위/노트`) + 중간 폴더 자동 생성, 위키링크 파일명 기반 해석
+- 입력 필드에서 `v`/`s`/`e` 입력 시 모드가 전환되던 문제 수정
+
+---
+
 ## v3.0.0
 
 ### 🚀 Major Release / 메이저 릴리즈
